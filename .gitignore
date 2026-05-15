@@ -1,0 +1,20 @@
+# entorno virtual
+.venv/
+venv/
+env/
+
+# variables secretas
+.env
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# vscode
+.vscode/
+
+# sistema
+.DS_Store
+Thumbs.db
