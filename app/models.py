@@ -35,17 +35,19 @@ class ReviewStatus(str, enum.Enum):
 class Profile(Base):
     __tablename__ = "profiles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(Text, unique=True, nullable=False)
+    password = Column(Text, nullable=False)
     full_name = Column(Text)
     faculty = Column(Text)
     skills = Column(ARRAY(Text))
-    role = Column(SqlEnum(UserRole, name="user_role", create_type=False))
-    created_at = Column(DateTime(timezone=True))
+    role = Column(SqlEnum(UserRole, name="user_role", create_type=False), default=UserRole.emprendedor)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
 
-    posts = relationship("Post", back_populates="author")
-    led_projects = relationship("Project", back_populates="leader", foreign_keys="Project.leader_id")
-    memberships = relationship("ProjectMember", back_populates="user")
-    mentorships = relationship("ProjectMentor", back_populates="mentor")
+    posts = relationship("Post", back_populates="author", passive_deletes=True)
+    led_projects = relationship("Project", back_populates="leader", foreign_keys="Project.leader_id", passive_deletes=True)
+    memberships = relationship("ProjectMember", back_populates="user", cascade="all, delete")
+    mentorships = relationship("ProjectMentor", back_populates="mentor", cascade="all, delete")
 
 
 class Cohort(Base):

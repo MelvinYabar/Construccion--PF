@@ -8,7 +8,7 @@ from app.auth import can_access_project, get_current_user, is_project_member, is
 from app.database import get_db
 
 
-router = APIRouter(tags=["Deliverables"])
+router = APIRouter(tags=["Deliverables & Reviews"])
 
 
 def get_project_or_404(db: Session, project_id: UUID) -> models.Project:
@@ -17,6 +17,21 @@ def get_project_or_404(db: Session, project_id: UUID) -> models.Project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
     return project
 
+
+def get_deliverable_or_404(db: Session, deliverable_id: UUID) -> models.Deliverable:
+    deliverable = db.query(models.Deliverable).filter(models.Deliverable.id == deliverable_id).first()
+    if not deliverable:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deliverable not found")
+    return deliverable
+
+
+# ===========================================================================
+# DELIVERABLES CRUD
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# CREATE
+# ---------------------------------------------------------------------------
 
 @router.post(
     "/projects/{project_id}/deliverables",
@@ -29,6 +44,7 @@ def create_deliverable(
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
+    """Sube un entregable a un proyecto. Solo miembros del proyecto pueden subir entregables."""
     get_project_or_404(db, project_id)
 
     phase = db.query(models.Phase).filter(models.Phase.id == deliverable_in.phase_id).first()
@@ -50,12 +66,17 @@ def create_deliverable(
     return deliverable
 
 
+# ---------------------------------------------------------------------------
+# READ – List by project
+# ---------------------------------------------------------------------------
+
 @router.get("/projects/{project_id}/deliverables", response_model=list[schemas.DeliverableWithReviewResponse])
 def list_deliverables(
     project_id: UUID,
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
+    """Lista los entregables de un proyecto con su última revisión."""
     get_project_or_404(db, project_id)
     if not can_access_project(db, project_id, current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project access denied")
@@ -89,6 +110,107 @@ def list_deliverables(
     return response
 
 
+# ---------------------------------------------------------------------------
+# READ – Get by ID
+# ---------------------------------------------------------------------------
+
+@router.get("/deliverables/{deliverable_id}", response_model=schemas.DeliverableWithReviewResponse)
+def get_deliverable(
+    deliverable_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Obtiene un entregable por su ID con su última revisión."""
+    deliverable = get_deliverable_or_404(db, deliverable_id)
+
+    if not can_access_project(db, deliverable.project_id, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project access denied")
+
+    review = (
+        db.query(models.DeliverableReview)
+        .filter(models.DeliverableReview.deliverable_id == deliverable.id)
+        .order_by(models.DeliverableReview.reviewed_at.desc())
+        .first()
+    )
+
+    return schemas.DeliverableWithReviewResponse(
+        id=deliverable.id,
+        project_id=deliverable.project_id,
+        phase_id=deliverable.phase_id,
+        uploaded_by=deliverable.uploaded_by,
+        file_url=deliverable.file_url,
+        created_at=deliverable.created_at,
+        review=review,
+    )
+
+
+# ---------------------------------------------------------------------------
+# UPDATE
+# ---------------------------------------------------------------------------
+
+@router.put("/deliverables/{deliverable_id}", response_model=schemas.DeliverableResponse)
+def update_deliverable(
+    deliverable_id: UUID,
+    deliverable_in: schemas.DeliverableUpdate,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Actualiza un entregable. Solo el miembro que lo subió o un admin pueden editarlo."""
+    deliverable = get_deliverable_or_404(db, deliverable_id)
+
+    if current_user.role != models.UserRole.admin and deliverable.uploaded_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the uploader or an admin can update this deliverable",
+        )
+
+    update_data = deliverable_in.model_dump(exclude_unset=True)
+
+    if "phase_id" in update_data:
+        phase = db.query(models.Phase).filter(models.Phase.id == update_data["phase_id"]).first()
+        if not phase:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Phase not found")
+
+    for field, value in update_data.items():
+        setattr(deliverable, field, value)
+
+    db.commit()
+    db.refresh(deliverable)
+    return deliverable
+
+
+# ---------------------------------------------------------------------------
+# DELETE
+# ---------------------------------------------------------------------------
+
+@router.delete("/deliverables/{deliverable_id}", response_model=schemas.MessageResponse)
+def delete_deliverable(
+    deliverable_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Elimina un entregable. Solo el miembro que lo subió o un admin pueden eliminarlo."""
+    deliverable = get_deliverable_or_404(db, deliverable_id)
+
+    if current_user.role != models.UserRole.admin and deliverable.uploaded_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the uploader or an admin can delete this deliverable",
+        )
+
+    db.delete(deliverable)
+    db.commit()
+    return {"message": "Deliverable deleted successfully"}
+
+
+# ===========================================================================
+# DELIVERABLE REVIEWS CRUD
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# CREATE
+# ---------------------------------------------------------------------------
+
 @router.post(
     "/deliverables/{deliverable_id}/reviews",
     response_model=schemas.DeliverableReviewResponse,
@@ -100,6 +222,7 @@ def create_deliverable_review(
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
+    """Crea una revisión de entregable. Solo mentores pueden revisar. Si se aprueba, avanza la fase automáticamente."""
     require_roles(current_user, [models.UserRole.mentor])
 
     if review_in.status not in [models.ReviewStatus.aprobado, models.ReviewStatus.rechazado]:
@@ -142,3 +265,103 @@ def create_deliverable_review(
 
     db.refresh(review)
     return review
+
+
+# ---------------------------------------------------------------------------
+# READ – List reviews for a deliverable
+# ---------------------------------------------------------------------------
+
+@router.get("/deliverables/{deliverable_id}/reviews", response_model=list[schemas.DeliverableReviewResponse])
+def list_deliverable_reviews(
+    deliverable_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Lista todas las revisiones de un entregable."""
+    deliverable = get_deliverable_or_404(db, deliverable_id)
+
+    if not can_access_project(db, deliverable.project_id, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project access denied")
+
+    reviews = (
+        db.query(models.DeliverableReview)
+        .filter(models.DeliverableReview.deliverable_id == deliverable_id)
+        .order_by(models.DeliverableReview.reviewed_at.desc())
+        .all()
+    )
+    return reviews
+
+
+# ---------------------------------------------------------------------------
+# READ – Get review by ID
+# ---------------------------------------------------------------------------
+
+@router.get("/reviews/{review_id}", response_model=schemas.DeliverableReviewResponse)
+def get_review(
+    review_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Obtiene una revisión por su ID."""
+    review = db.query(models.DeliverableReview).filter(models.DeliverableReview.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+
+    deliverable = db.query(models.Deliverable).filter(models.Deliverable.id == review.deliverable_id).first()
+    if deliverable and not can_access_project(db, deliverable.project_id, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    return review
+
+
+# ---------------------------------------------------------------------------
+# UPDATE
+# ---------------------------------------------------------------------------
+
+@router.put("/reviews/{review_id}", response_model=schemas.DeliverableReviewResponse)
+def update_review(
+    review_id: UUID,
+    review_in: schemas.DeliverableReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Actualiza una revisión. Solo el mentor que la creó o un admin pueden editarla."""
+    review = db.query(models.DeliverableReview).filter(models.DeliverableReview.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+
+    if current_user.role != models.UserRole.admin and review.mentor_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the reviewing mentor or an admin can update this review",
+        )
+
+    update_data = review_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(review, field, value)
+
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+# ---------------------------------------------------------------------------
+# DELETE
+# ---------------------------------------------------------------------------
+
+@router.delete("/reviews/{review_id}", response_model=schemas.MessageResponse)
+def delete_review(
+    review_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Elimina una revisión. Solo administradores pueden eliminar revisiones."""
+    require_roles(current_user, [models.UserRole.admin])
+
+    review = db.query(models.DeliverableReview).filter(models.DeliverableReview.id == review_id).first()
+    if not review:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+
+    db.delete(review)
+    db.commit()
+    return {"message": "Review deleted successfully"}

@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from dotenv import load_dotenv
@@ -13,50 +14,76 @@ from app import models, schemas
 
 load_dotenv()
 
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+JWT_SECRET = os.getenv("JWT_SECRET", "parmenia-dev-secret-change-in-production")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24
+
 security = HTTPBearer(
     scheme_name="BearerAuth",
-    description="Ingresa solo el access_token de Supabase. Swagger agregará Bearer automáticamente.",
+    description="Ingresa el JWT obtenido de /auth/login.",
 )
 
 
+# ---------------------------------------------------------------------------
+# JWT creation
+# ---------------------------------------------------------------------------
+
+def create_access_token(user_id: UUID, role: str) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "role": role,
+        "iat": now,
+        "exp": now + timedelta(hours=JWT_EXPIRATION_HOURS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+# ---------------------------------------------------------------------------
+# JWT validation
+# ---------------------------------------------------------------------------
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> schemas.AuthenticatedUser:
-    if not SUPABASE_JWT_SECRET:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="JWT secret is not configured")
-
     token = credentials.credentials
     try:
-        claims = jwt.decode(
-            token,
-            SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except JWTError:
-        # Desarrollo: algunos tokens de Supabase usan ES256. En producción debe validarse con JWKS de Supabase.
-        try:
-            claims = jwt.get_unverified_claims(token)
-        except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalido o expirado",
+        )
 
-    user_id = claims.get("sub")
+    user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalido",
+        )
 
     try:
         profile_id = UUID(user_id)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalido",
+        ) from None
 
     profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
     if not profile:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User profile not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Usuario no encontrado",
+        )
 
     return schemas.AuthenticatedUser.model_validate(profile)
 
+
+# ---------------------------------------------------------------------------
+# Role helpers
+# ---------------------------------------------------------------------------
 
 def require_roles(current_user: schemas.AuthenticatedUser, allowed_roles: list[models.UserRole]) -> None:
     if current_user.role not in allowed_roles:
