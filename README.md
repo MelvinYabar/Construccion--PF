@@ -2,6 +2,13 @@
 
 Backend REST API para la gestión de la incubadora de empresas **Parmenia**. Digitaliza convocatorias, inscripciones, proyectos, entregables, mentores y publicaciones.
 
+## Integrantes
+
+- Huamani Vásquez Juan José
+- Florez Gonzalez Fatima
+- Yabar Carazas Melvin Jarred
+- Zela Flores Gabriel Frank
+
 ## Tecnologías
 
 | Componente    | Tecnología                      |
