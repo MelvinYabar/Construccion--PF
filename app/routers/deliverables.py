@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.auth import can_access_project, get_current_user, is_project_member, is_project_mentor, require_roles
+from app.auth import can_access_project, get_current_user, is_admin, is_project_member, is_project_mentor, require_roles
 from app.database import get_db
 
 
@@ -51,8 +51,8 @@ def create_deliverable(
     if not phase:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Phase not found")
 
-    if not is_project_member(db, project_id, current_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only project members can upload deliverables")
+    if not is_admin(current_user) and not is_project_member(db, project_id, current_user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo miembros del proyecto o admin pueden subir entregables")
 
     deliverable = models.Deliverable(
         project_id=project_id,
@@ -158,10 +158,10 @@ def update_deliverable(
     """Actualiza un entregable. Solo el miembro que lo subió o un admin pueden editarlo."""
     deliverable = get_deliverable_or_404(db, deliverable_id)
 
-    if current_user.role != models.UserRole.admin and deliverable.uploaded_by != current_user.id:
+    if not is_admin(current_user) and deliverable.uploaded_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the uploader or an admin can update this deliverable",
+            detail="Solo quien subio el entregable o admin pueden actualizarlo",
         )
 
     update_data = deliverable_in.model_dump(exclude_unset=True)
@@ -192,10 +192,10 @@ def delete_deliverable(
     """Elimina un entregable. Solo el miembro que lo subió o un admin pueden eliminarlo."""
     deliverable = get_deliverable_or_404(db, deliverable_id)
 
-    if current_user.role != models.UserRole.admin and deliverable.uploaded_by != current_user.id:
+    if not is_admin(current_user) and deliverable.uploaded_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the uploader or an admin can delete this deliverable",
+            detail="Solo quien subio el entregable o admin pueden eliminarlo",
         )
 
     db.delete(deliverable)
@@ -223,7 +223,7 @@ def create_deliverable_review(
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
     """Crea una revisión de entregable. Solo mentores pueden revisar. Si se aprueba, avanza la fase automáticamente."""
-    require_roles(current_user, [models.UserRole.mentor])
+    require_roles(current_user, [models.UserRole.admin, models.UserRole.mentor])
 
     if review_in.status not in [models.ReviewStatus.aprobado, models.ReviewStatus.rechazado]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status must be aprobado or rechazado")
@@ -232,7 +232,7 @@ def create_deliverable_review(
     if not deliverable:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Deliverable not found")
 
-    if not is_project_mentor(db, deliverable.project_id, current_user.id):
+    if not is_admin(current_user) and not is_project_mentor(db, deliverable.project_id, current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mentor is not assigned to this project")
 
     review = models.DeliverableReview(
@@ -330,10 +330,10 @@ def update_review(
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
 
-    if current_user.role != models.UserRole.admin and review.mentor_id != current_user.id:
+    if not is_admin(current_user) and review.mentor_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the reviewing mentor or an admin can update this review",
+            detail="Solo el mentor que reviso o admin pueden actualizar esta revision",
         )
 
     update_data = review_in.model_dump(exclude_unset=True)

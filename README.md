@@ -158,6 +158,26 @@ Desde ese momento, el frontend consume todos los endpoints protegidos con:
 Authorization: Bearer <access_token>
 ```
 
+## Permisos por Rol
+
+El backend valida permisos con el rol incluido en el JWT y confirmado contra el perfil de la base de datos.
+
+| Rol | Permisos |
+| --- | --- |
+| `admin` | Puede crear, listar, actualizar y eliminar recursos. Tambien puede ver reportes, gestionar fases, convocatorias, perfiles, proyectos, mentores, entregables y revisiones. |
+| `emprendedor` | Puede ver/editar su propio perfil, inscribirse en convocatorias, crear proyectos, ver sus proyectos, subir/editar sus entregables y consultar publicaciones/fases/convocatorias. No puede crear admins, ver reportes admin, borrar recursos globales ni cambiarse el rol. |
+| `mentor` | Puede consultar proyectos asignados, crear publicaciones y revisar entregables de proyectos donde esta asignado. |
+
+Ejemplos para demostrar:
+
+```text
+GET /reports/dashboard con admin -> 200 OK
+GET /reports/dashboard con emprendedor -> 403 Forbidden
+GET /profiles/ con admin -> lista todos
+GET /profiles/ con emprendedor -> solo devuelve su propio perfil
+PUT /profiles/{id} con role=admin desde emprendedor -> mantiene role=emprendedor
+```
+
 ## Endpoints Cubiertos por el Frontend
 
 ### Autenticacion

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.auth import can_access_project, get_current_user, is_project_member, is_project_mentor, require_roles
+from app.auth import can_access_project, get_current_user, is_admin, is_project_member, is_project_mentor, require_roles
 from app.database import get_db
 
 
@@ -32,8 +32,8 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
-    """Crea un nuevo proyecto. Solo emprendedores pueden crear proyectos."""
-    require_roles(current_user, [models.UserRole.emprendedor])
+    """Crea un nuevo proyecto. Emprendedores crean sus proyectos; admin tambien puede hacerlo."""
+    require_roles(current_user, [models.UserRole.admin, models.UserRole.emprendedor])
 
     if project_in.cohort_id:
         cohort = db.query(models.Cohort).filter(models.Cohort.id == project_in.cohort_id).first()
@@ -131,13 +131,15 @@ def update_project(
     """Actualiza un proyecto. Solo el líder del proyecto o un administrador pueden editarlo."""
     project = get_project_or_404(db, project_id)
 
-    if current_user.role != models.UserRole.admin and project.leader_id != current_user.id:
+    if not is_admin(current_user) and project.leader_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the project leader or an admin can update this project",
+            detail="Solo el lider del proyecto o un admin pueden actualizar este proyecto",
         )
 
     update_data = project_in.model_dump(exclude_unset=True)
+    if not is_admin(current_user):
+        update_data.pop("current_phase_id", None)
 
     if "cohort_id" in update_data and update_data["cohort_id"]:
         cohort = db.query(models.Cohort).filter(models.Cohort.id == update_data["cohort_id"]).first()
@@ -189,8 +191,8 @@ def add_project_member(
 ):
     """Agrega un miembro al proyecto. Solo el líder del proyecto o un admin pueden agregar miembros."""
     project = get_project_or_404(db, project_id)
-    if current_user.role != models.UserRole.admin and project.leader_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the project leader or admin can add members")
+    if not is_admin(current_user) and project.leader_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el lider del proyecto o admin pueden agregar miembros")
 
     user = db.query(models.Profile).filter(models.Profile.id == member_in.user_id).first()
     if not user:
@@ -231,8 +233,8 @@ def remove_project_member(
     """Elimina un miembro del proyecto. Solo el líder o un admin pueden remover miembros."""
     project = get_project_or_404(db, project_id)
 
-    if current_user.role != models.UserRole.admin and project.leader_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the project leader or admin can remove members")
+    if not is_admin(current_user) and project.leader_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el lider del proyecto o admin pueden remover miembros")
 
     if project.leader_id == user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot remove the project leader")

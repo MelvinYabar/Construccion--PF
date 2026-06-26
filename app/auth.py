@@ -87,7 +87,11 @@ def get_current_user(
 
 def require_roles(current_user: schemas.AuthenticatedUser, allowed_roles: list[models.UserRole]) -> None:
     if current_user.role not in allowed_roles:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
+
+
+def is_admin(current_user: schemas.AuthenticatedUser) -> bool:
+    return current_user.role == models.UserRole.admin
 
 
 def is_project_member(db: Session, project_id, user_id) -> bool:

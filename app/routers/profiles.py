@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.auth import get_current_user, require_roles
+from app.auth import get_current_user, is_admin, require_roles
 from app.database import get_db
+from app.supabase_auth import create_supabase_auth_user
 
 
 router = APIRouter(prefix="/profiles", tags=["Profiles"])
@@ -31,15 +32,31 @@ def create_profile(
             detail="Ya existe un usuario con ese email",
         )
 
-    profile = models.Profile(
+    create_supabase_auth_user(
         email=profile_in.email,
         password=profile_in.password,
         full_name=profile_in.full_name,
-        faculty=profile_in.faculty,
-        skills=profile_in.skills,
-        role=profile_in.role,
+        role=profile_in.role.value,
     )
-    db.add(profile)
+
+    profile = db.query(models.Profile).filter(models.Profile.email == profile_in.email).first()
+    if profile is None:
+        profile = models.Profile(
+            email=profile_in.email,
+            password=profile_in.password,
+            full_name=profile_in.full_name,
+            faculty=profile_in.faculty,
+            skills=profile_in.skills,
+            role=profile_in.role,
+        )
+        db.add(profile)
+    else:
+        profile.password = profile_in.password
+        profile.full_name = profile_in.full_name
+        profile.faculty = profile_in.faculty
+        profile.skills = profile_in.skills
+        profile.role = profile_in.role
+
     db.commit()
     db.refresh(profile)
     return profile
@@ -56,7 +73,10 @@ def list_profiles(
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
-    """Lista todos los perfiles. Disponible para todos los usuarios autenticados."""
+    """Lista perfiles. Admin ve todos; usuarios no admin solo ven su propio perfil."""
+    if not is_admin(current_user):
+        return db.query(models.Profile).filter(models.Profile.id == current_user.id).all()
+
     return db.query(models.Profile).offset(skip).limit(limit).all()
 
 
@@ -70,7 +90,10 @@ def get_profile(
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
-    """Obtiene un perfil por su ID."""
+    """Obtiene un perfil por su ID. Usuarios no admin solo pueden consultar su perfil."""
+    if not is_admin(current_user) and current_user.id != profile_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo puedes ver tu propio perfil")
+
     profile = db.query(models.Profile).filter(models.Profile.id == profile_id).first()
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
@@ -93,13 +116,16 @@ def update_profile(
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
 
-    if current_user.role != models.UserRole.admin and current_user.id != profile_id:
+    if not is_admin(current_user) and current_user.id != profile_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only update your own profile",
+            detail="Solo puedes actualizar tu propio perfil",
         )
 
     update_data = profile_in.model_dump(exclude_unset=True)
+    if not is_admin(current_user):
+        update_data.pop("role", None)
+
     for field, value in update_data.items():
         setattr(profile, field, value)
 

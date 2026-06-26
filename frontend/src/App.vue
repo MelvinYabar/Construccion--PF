@@ -32,6 +32,59 @@ const reports = reactive({
 
 const activeResource = computed(() => resources.find((item) => item.key === activeKey.value))
 const isAuthenticated = computed(() => Boolean(token.value && user.value))
+const isAdmin = computed(() => user.value?.role === 'admin')
+const isMentor = computed(() => user.value?.role === 'mentor')
+const visibleResources = computed(() => resources.filter((resource) => canAccessResource(resource, 'view')))
+
+function canAccessResource(resource, action) {
+  if (!user.value) return false
+  if (isAdmin.value) return true
+
+  const permissions = {
+    emprendedor: {
+      profiles: ['view', 'list', 'get', 'update'],
+      phases: ['view', 'list', 'get'],
+      cohorts: ['view', 'list', 'get'],
+      enrollments: ['view', 'list', 'get', 'create'],
+      projects: ['view', 'list', 'get', 'create', 'update'],
+      posts: ['view', 'list', 'get'],
+      deliverables: ['view', 'get', 'update', 'delete'],
+      reviews: ['view', 'get'],
+    },
+    mentor: {
+      profiles: ['view', 'list', 'get', 'update'],
+      phases: ['view', 'list', 'get'],
+      cohorts: ['view', 'list', 'get'],
+      enrollments: ['view', 'list', 'get'],
+      projects: ['view', 'list', 'get'],
+      posts: ['view', 'list', 'get', 'create', 'update', 'delete'],
+      deliverables: ['view', 'get'],
+      reviews: ['view', 'get', 'create', 'update'],
+    },
+  }
+
+  return permissions[user.value.role]?.[resource.key]?.includes(action) || false
+}
+
+function canRunAction(action) {
+  if (!user.value) return false
+  if (isAdmin.value) return true
+
+  const permissions = {
+    emprendedor: [
+      'members-list',
+      'members-add',
+      'members-remove',
+      'mentors-list',
+      'deliverables-list',
+      'deliverables-add',
+      'reviews-list',
+    ],
+    mentor: ['members-list', 'mentors-list', 'deliverables-list', 'reviews-list', 'reviews-add'],
+  }
+
+  return permissions[user.value.role]?.includes(action.key) || false
+}
 
 function setMessage(message, type = 'notice') {
   notice.value = type === 'notice' ? message : ''
@@ -257,7 +310,7 @@ onMounted(async () => {
 
       <nav v-if="isAuthenticated">
         <button :class="{ active: activeKey === 'dashboard' }" @click="activeKey = 'dashboard'">Dashboard</button>
-        <button v-for="resource in resources" :key="resource.key" :class="{ active: activeKey === resource.key }" @click="activeKey = resource.key">
+        <button v-for="resource in visibleResources" :key="resource.key" :class="{ active: activeKey === resource.key }" @click="activeKey = resource.key">
           {{ resource.title }}
         </button>
       </nav>
@@ -322,13 +375,13 @@ onMounted(async () => {
           <pre>{{ reports.health }}</pre>
         </article>
 
-        <article class="panel">
+        <article v-if="isAdmin" class="panel">
           <h2>Reporte admin</h2>
           <button @click="loadDashboardReport">GET /reports/dashboard</button>
           <pre>{{ reports.dashboard }}</pre>
         </article>
 
-        <article class="panel wide">
+        <article v-if="isAdmin || isMentor" class="panel wide">
           <h2>Reporte por cohorte</h2>
           <div class="inline">
             <input v-model="reports.cohortId" placeholder="ID de cohorte" />
@@ -340,14 +393,14 @@ onMounted(async () => {
 
       <section v-else-if="activeResource" class="resource">
         <div class="toolbar">
-          <button v-if="activeResource.canList !== false" @click="listResource(activeResource)">Listar {{ activeResource.title }}</button>
+          <button v-if="activeResource.canList !== false && canAccessResource(activeResource, 'list')" @click="listResource(activeResource)">Listar {{ activeResource.title }}</button>
           <input v-model="stateFor(activeResource).selectedId" placeholder="ID para obtener/eliminar" />
-          <button @click="getResource(activeResource)">Obtener por ID</button>
-          <button v-if="activeResource.canDelete" class="danger" @click="deleteResource(activeResource)">Eliminar por ID</button>
+          <button v-if="canAccessResource(activeResource, 'get')" @click="getResource(activeResource)">Obtener por ID</button>
+          <button v-if="activeResource.canDelete && canAccessResource(activeResource, 'delete')" class="danger" @click="deleteResource(activeResource)">Eliminar por ID</button>
         </div>
 
         <div class="grid">
-          <form v-if="activeResource.canCreate" class="panel" @submit.prevent="createResource(activeResource)">
+          <form v-if="activeResource.canCreate && canAccessResource(activeResource, 'create')" class="panel" @submit.prevent="createResource(activeResource)">
             <h2>Crear</h2>
             <template v-for="field in activeResource.createFields" :key="field.name">
               <label>
@@ -364,7 +417,7 @@ onMounted(async () => {
             <button type="submit">Crear</button>
           </form>
 
-          <form v-if="activeResource.canUpdate" class="panel" @submit.prevent="updateResource(activeResource)">
+          <form v-if="activeResource.canUpdate && canAccessResource(activeResource, 'update')" class="panel" @submit.prevent="updateResource(activeResource)">
             <h2>Actualizar</h2>
             <label>ID<input v-model="stateFor(activeResource).updateId" required /></label>
             <template v-for="field in activeResource.updateFields" :key="field.name">
@@ -401,8 +454,8 @@ onMounted(async () => {
                 </td>
                 <td>
                   <button @click="stateFor(activeResource).selectedId = item[activeResource.idField]; getResource(activeResource)">Ver</button>
-                  <button v-if="activeResource.canDelete" class="danger" @click="deleteResource(activeResource, item[activeResource.idField])">Eliminar</button>
-                  <div v-for="action in activeResource.customActions || []" :key="action.key" class="action-box">
+                  <button v-if="activeResource.canDelete && canAccessResource(activeResource, 'delete')" class="danger" @click="deleteResource(activeResource, item[activeResource.idField])">Eliminar</button>
+                  <div v-for="action in (activeResource.customActions || []).filter(canRunAction)" :key="action.key" class="action-box">
                     <template v-if="action.fields">
                       <label v-for="field in action.fields" :key="field.name">
                         {{ field.label }}

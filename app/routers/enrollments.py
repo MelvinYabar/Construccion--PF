@@ -21,8 +21,8 @@ def create_enrollment(
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
-    """Un emprendedor se inscribe en una cohorte."""
-    require_roles(current_user, [models.UserRole.emprendedor])
+    """Un emprendedor se inscribe en una cohorte. Admin tambien puede probar el endpoint."""
+    require_roles(current_user, [models.UserRole.admin, models.UserRole.emprendedor])
 
     cohort = db.query(models.Cohort).filter(models.Cohort.id == enrollment_in.cohort_id).first()
     if not cohort:
