@@ -1,7 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { apiRequest, authApi, clearSession, getStoredUser, setSession } from './api'
-import { resources, roleOptions } from './resources'
+import { resources } from './resources'
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
@@ -20,6 +20,7 @@ const registerForm = reactive({
   skills: '',
   role: 'emprendedor',
 })
+const publicRegisterRoles = ['emprendedor', 'mentor']
 
 const resourceState = reactive({})
 const reports = reactive({
@@ -294,7 +295,7 @@ onMounted(async () => {
           <label>Habilidades<input v-model="registerForm.skills" placeholder="Python, Vue, UX" /></label>
           <label>Rol
             <select v-model="registerForm.role">
-              <option v-for="role in roleOptions" :key="role" :value="role">{{ role }}</option>
+              <option v-for="role in publicRegisterRoles" :key="role" :value="role">{{ role }}</option>
             </select>
           </label>
           <button type="submit">Crear cuenta</button>

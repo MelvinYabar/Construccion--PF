@@ -20,6 +20,12 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/register", response_model=schemas.AuthResponse, status_code=status.HTTP_201_CREATED)
 def register(user_in: schemas.RegisterRequest, db: Session = Depends(get_db)):
     """Registra un nuevo usuario y crea su perfil automaticamente."""
+    if user_in.role == models.UserRole.admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No se puede registrar una cuenta admin desde el formulario publico",
+        )
+
     existing = db.query(models.Profile).filter(models.Profile.email == user_in.email).first()
     if existing:
         raise HTTPException(
