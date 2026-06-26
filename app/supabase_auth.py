@@ -39,6 +39,7 @@ def create_supabase_auth_user(
             "password": generated_password,
             "email_confirm": True,
             "user_metadata": {
+                "email": email,
                 "full_name": full_name,
                 "role": role,
                 "source": "parmenia-fastapi",

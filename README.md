@@ -56,6 +56,18 @@ SUPABASE_SERVICE_ROLE_KEY=paste-your-service-role-key
 
 `SUPABASE_SERVICE_ROLE_KEY` solo debe existir en el backend. Nunca debe ponerse en el frontend ni subirse a GitHub.
 
+## Configuracion Supabase
+
+El proyecto usa Supabase como PostgreSQL y tambien sincroniza los registros con **Authentication > Users**.
+
+Para que los usuarios creados desde la pagina aparezcan correctamente en Supabase Auth y en `public.profiles`, aplica la migracion:
+
+```text
+supabase/migrations/001_fix_handle_new_user_profile_sync.sql
+```
+
+Esa funcion usa el email real de `auth.users` y crea/actualiza el perfil relacionado.
+
 ## Configuracion Frontend
 
 Crea `frontend/.env`:

@@ -41,15 +41,24 @@ def register(user_in: schemas.RegisterRequest, db: Session = Depends(get_db)):
         role=user_in.role.value,
     )
 
-    profile = models.Profile(
-        email=user_in.email,
-        password=user_in.password,
-        full_name=user_in.full_name,
-        faculty=user_in.faculty,
-        skills=user_in.skills,
-        role=user_in.role,
-    )
-    db.add(profile)
+    profile = db.query(models.Profile).filter(models.Profile.email == user_in.email).first()
+    if profile is None:
+        profile = models.Profile(
+            email=user_in.email,
+            password=user_in.password,
+            full_name=user_in.full_name,
+            faculty=user_in.faculty,
+            skills=user_in.skills,
+            role=user_in.role,
+        )
+        db.add(profile)
+    else:
+        profile.password = user_in.password
+        profile.full_name = user_in.full_name
+        profile.faculty = user_in.faculty
+        profile.skills = user_in.skills
+        profile.role = user_in.role
+
     db.commit()
     db.refresh(profile)
 
@@ -126,15 +135,21 @@ def login_with_google(payload: schemas.GoogleOAuthRequest, db: Session = Depends
             role=models.UserRole.emprendedor.value,
         )
 
-        profile = models.Profile(
-            email=email,
-            password="oauth2-google",
-            full_name=claims.get("name"),
-            faculty=None,
-            skills=[],
-            role=models.UserRole.emprendedor,
-        )
-        db.add(profile)
+        profile = db.query(models.Profile).filter(models.Profile.email == email).first()
+        if profile is None:
+            profile = models.Profile(
+                email=email,
+                password="oauth2-google",
+                full_name=claims.get("name"),
+                faculty=None,
+                skills=[],
+                role=models.UserRole.emprendedor,
+            )
+            db.add(profile)
+        else:
+            profile.password = profile.password or "oauth2-google"
+            profile.full_name = profile.full_name or claims.get("name")
+            profile.role = profile.role or models.UserRole.emprendedor
         db.commit()
         db.refresh(profile)
     else:
