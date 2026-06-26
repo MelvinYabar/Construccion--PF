@@ -28,6 +28,15 @@ const reports = reactive({
   cohortId: '',
   cohortProgress: null,
 })
+const mentorshipForm = reactive({
+  title: 'Mentoria Parmenia',
+  description: '',
+  start_datetime: '',
+  end_datetime: '',
+  attendee_emails: '',
+  create_meet: true,
+})
+const mentorshipResult = ref(null)
 
 const activeResource = computed(() => resources.find((item) => item.key === activeKey.value))
 const isAuthenticated = computed(() => Boolean(token.value && user.value))
@@ -265,6 +274,42 @@ async function loadCohortReport() {
   reports.cohortProgress = await safeRun(() => apiRequest(`/reports/cohort/${reports.cohortId}/progress`))
 }
 
+async function scheduleMentorshipWithGoogle() {
+  if (!googleClientId) return setMessage('Configura VITE_GOOGLE_CLIENT_ID en frontend/.env', 'error')
+  if (!window.google?.accounts?.oauth2) return setMessage('Google Identity Services aun no cargo', 'error')
+  if (!mentorshipForm.start_datetime || !mentorshipForm.end_datetime) {
+    return setMessage('Selecciona fecha y hora de inicio y fin', 'error')
+  }
+
+  const tokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: googleClientId,
+    scope: 'https://www.googleapis.com/auth/calendar.events',
+    callback: async (tokenResponse) => {
+      if (tokenResponse.error || !tokenResponse.access_token) {
+        setMessage('No se pudo autorizar Google Calendar', 'error')
+        return
+      }
+
+      const body = {
+        title: mentorshipForm.title,
+        description: mentorshipForm.description,
+        start_datetime: new Date(mentorshipForm.start_datetime).toISOString(),
+        end_datetime: new Date(mentorshipForm.end_datetime).toISOString(),
+        attendee_emails: normalizeList(mentorshipForm.attendee_emails),
+        create_meet: mentorshipForm.create_meet,
+        google_access_token: tokenResponse.access_token,
+      }
+
+      mentorshipResult.value = await safeRun(
+        () => apiRequest('/integrations/google-calendar/mentorships', { method: 'POST', body }),
+        'Mentoria creada en Google Calendar',
+      )
+    },
+  })
+
+  tokenClient.requestAccessToken({ prompt: 'consent' })
+}
+
 function formatValue(value) {
   if (value === null || value === undefined) return '-'
   if (Array.isArray(value)) return value.join(', ')
@@ -310,6 +355,12 @@ function formatLabel(key) {
     access_token: 'Token',
     token_type: 'Tipo',
     message: 'Mensaje',
+    event_id: 'Evento',
+    html_link: 'Calendario',
+    meet_link: 'Meet',
+    attendees: 'Invitados',
+    start: 'Inicio',
+    end: 'Fin',
   }
 
   return labels[key] || key.replaceAll('_', ' ')
@@ -325,6 +376,7 @@ function importantFields(resource, item) {
     posts: ['title', 'content', 'is_published', 'published_at'],
     deliverables: ['file_url', 'project_id', 'phase_id', 'uploaded_by', 'created_at'],
     reviews: ['status', 'feedback', 'mentor_id', 'reviewed_at'],
+    calendar: ['event_id', 'start', 'end', 'attendees', 'meet_link', 'html_link'],
   }
 
   const fields = fieldsByResource[resource?.key] || Object.keys(item || {})
@@ -492,6 +544,35 @@ onMounted(async () => {
             </div>
           </div>
           <p v-else class="muted">Ingresa una cohorte para ver su progreso.</p>
+        </article>
+
+        <article class="panel wide">
+          <h2>Agendar mentoria con Google Calendar</h2>
+          <div class="grid">
+            <label>Titulo<input v-model="mentorshipForm.title" /></label>
+            <label>Invitados<input v-model="mentorshipForm.attendee_emails" placeholder="correo1@gmail.com, correo2@gmail.com" /></label>
+            <label>Inicio<input v-model="mentorshipForm.start_datetime" type="datetime-local" /></label>
+            <label>Fin<input v-model="mentorshipForm.end_datetime" type="datetime-local" /></label>
+          </div>
+          <label>Descripcion<textarea v-model="mentorshipForm.description"></textarea></label>
+          <label class="checkbox-row">
+            <input v-model="mentorshipForm.create_meet" type="checkbox" />
+            Crear enlace de Google Meet
+          </label>
+          <button @click="scheduleMentorshipWithGoogle">Autorizar y agendar</button>
+
+          <div v-if="mentorshipResult" class="calendar-result">
+            <h3>{{ mentorshipResult.title }}</h3>
+            <dl class="detail-list">
+              <template v-for="entry in importantFields({ key: 'calendar' }, mentorshipResult)" :key="entry.label">
+                <dt>{{ entry.label }}</dt>
+                <dd>
+                  <a v-if="String(entry.value).startsWith('http')" :href="entry.value" target="_blank" rel="noreferrer">{{ entry.value }}</a>
+                  <span v-else>{{ entry.value }}</span>
+                </dd>
+              </template>
+            </dl>
+          </div>
         </article>
       </section>
 

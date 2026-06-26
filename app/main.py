@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, cohorts, deliverables, enrollments, phases, posts, profiles, projects, reports
+from app.routers import auth, cohorts, deliverables, enrollments, integrations, phases, posts, profiles, projects, reports
 
 
 app = FastAPI(title="Pre-incubation Platform API", version="0.2.0")
@@ -29,3 +29,4 @@ app.include_router(posts.router)
 app.include_router(projects.router)
 app.include_router(deliverables.router)
 app.include_router(reports.router)
+app.include_router(integrations.router)

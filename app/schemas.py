@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import Depends
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import EnrollmentStatus, ReviewStatus, UserRole
 
@@ -353,3 +353,28 @@ class CohortProgressReport(BaseModel):
     cohort_name: Optional[str] = None
     total_projects: int
     projects: list[ProjectProgress]
+
+
+# ---------------------------------------------------------------------------
+# Integrations
+# ---------------------------------------------------------------------------
+
+class GoogleCalendarMentorshipCreate(BaseModel):
+    google_access_token: str
+    title: str = "Mentoria Parmenia"
+    description: Optional[str] = None
+    start_datetime: datetime
+    end_datetime: datetime
+    attendee_emails: list[str] = []
+    timezone: str = "America/Lima"
+    create_meet: bool = True
+
+
+class GoogleCalendarMentorshipResponse(BaseModel):
+    event_id: str
+    title: str
+    start: datetime
+    end: datetime
+    html_link: Optional[str] = None
+    meet_link: Optional[str] = None
+    attendees: list[str] = []

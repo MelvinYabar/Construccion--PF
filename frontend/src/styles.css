@@ -63,6 +63,16 @@ label {
   font-size: 13px;
 }
 
+.checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
 pre {
   max-width: 100%;
   overflow: auto;
@@ -353,6 +363,16 @@ td:last-child {
   min-height: 32px;
   padding: 0 12px;
   font-weight: 700;
+}
+
+.calendar-result {
+  border-top: 1px solid #e2e8f0;
+  margin-top: 14px;
+  padding-top: 14px;
+}
+
+.calendar-result a {
+  color: #0f766e;
 }
 
 .google-slot {

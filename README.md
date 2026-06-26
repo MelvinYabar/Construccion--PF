@@ -158,6 +158,50 @@ Desde ese momento, el frontend consume todos los endpoints protegidos con:
 Authorization: Bearer <access_token>
 ```
 
+## Integracion Externa: Google Calendar API
+
+El dashboard incluye una integracion con **Google Calendar API** para agendar mentorias.
+
+Flujo:
+
+```text
+1. El usuario inicia sesion en la app.
+2. En Dashboard completa titulo, fecha, hora e invitados.
+3. Presiona "Autorizar y agendar".
+4. Google solicita permiso para el scope https://www.googleapis.com/auth/calendar.events.
+5. El frontend recibe un access token temporal de Google.
+6. El backend usa ese token para crear el evento en Google Calendar.
+```
+
+Endpoint:
+
+```http
+POST /integrations/google-calendar/mentorships
+Authorization: Bearer <jwt_local>
+Content-Type: application/json
+```
+
+Body:
+
+```json
+{
+  "google_access_token": "<google_calendar_access_token>",
+  "title": "Mentoria Parmenia",
+  "description": "Revision de avance del proyecto",
+  "start_datetime": "2026-06-26T15:00:00-05:00",
+  "end_datetime": "2026-06-26T16:00:00-05:00",
+  "attendee_emails": ["mentor@gmail.com"],
+  "timezone": "America/Lima",
+  "create_meet": true
+}
+```
+
+Para que funcione en Google Cloud:
+
+- Habilita **Google Calendar API**.
+- En el OAuth Client usado por el frontend, agrega el origen autorizado `http://localhost:5173`.
+- En OAuth consent screen, permite el scope `https://www.googleapis.com/auth/calendar.events`.
+
 ## Permisos por Rol
 
 El backend valida permisos con el rol incluido en el JWT y confirmado contra el perfil de la base de datos.
