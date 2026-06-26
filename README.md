@@ -1,238 +1,248 @@
-# Parmenia - Plataforma de Pre-incubación (Backend MVP)
+# Parmenia - Plataforma de Pre-incubacion
 
-Backend REST API para la gestión de la incubadora de empresas **Parmenia**. Digitaliza convocatorias, inscripciones, proyectos, entregables, mentores y publicaciones.
+Aplicacion para la gestion de la incubadora de empresas **Parmenia**. Incluye:
 
-## Integrantes
+- Backend REST API con FastAPI.
+- Frontend en Vue.js.
+- Autenticacion tradicional con email/password.
+- OAuth2 / OpenID Connect con Google.
+- Consumo de todos los endpoints principales del backend desde el frontend.
 
-- Huamani Vásquez Juan José
-- Florez Gonzalez Fatima
-- Yabar Carazas Melvin Jarred
-- Zela Flores Gabriel Frank
+## Tecnologias
 
-## Tecnologías
+| Componente | Tecnologia |
+| --- | --- |
+| Backend | FastAPI |
+| ORM | SQLAlchemy |
+| Base de datos | PostgreSQL |
+| Auth local | JWT propio con `python-jose` |
+| OAuth2 | Google Identity Services |
+| Frontend | Vue 3 + Vite |
 
-| Componente    | Tecnología                      |
-| ------------- | ------------------------------- |
-| Lenguaje      | Python 3.10+                    |
-| Framework     | FastAPI                         |
-| ORM           | SQLAlchemy                      |
-| Base de datos | PostgreSQL (Supabase)           |
-| Autenticación | JWT propio (python-jose, HS256) |
-| Servidor ASGI | Uvicorn                         |
+## Estructura
 
-## Requisitos
-
-- Python 3.10+
-- PostgreSQL (Supabase)
-- pip
-
-## Instalación
-
-```bash
-# Clonar el repositorio
-git clone https://github.com/MelvinYabar/Construccion--PF.git
-cd Construccion--PF-main-CRUD
-
-# Crear entorno virtual
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-.venv\Scripts\activate     # Windows
-
-# Instalar dependencias
-pip install -r requirements.txt
+```text
+app/
+  main.py
+  auth.py
+  database.py
+  models.py
+  schemas.py
+  routers/
+frontend/
+  src/
+  package.json
 ```
 
-## Configuración
+## Configuracion Backend
 
-Crear un archivo `.env` en la raíz del proyecto:
+Copia `.env.example` a `.env`:
+
+```powershell
+copy .env.example .env
+```
+
+Configura:
 
 ```env
-DATABASE_URL=postgresql://postgres.epxuvpkzhtnutupfrcnl:Perritox23232@aws-1-us-east-1.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://user:password@host:5432/database
 JWT_SECRET=parmenia-dev-secret-change-in-production
+GOOGLE_CLIENT_ID=paste-your-google-client-id.apps.googleusercontent.com
 ```
 
-## Ejecutar
+`GOOGLE_CLIENT_ID` debe ser el Client ID del OAuth Client creado en Google Cloud.
 
-```bash
+## Configuracion Frontend
+
+Crea `frontend/.env`:
+
+```env
+VITE_API_URL=http://127.0.0.1:8000
+VITE_GOOGLE_CLIENT_ID=paste-your-google-client-id.apps.googleusercontent.com
+```
+
+`VITE_GOOGLE_CLIENT_ID` debe coincidir con `GOOGLE_CLIENT_ID`.
+
+## Ejecutar Backend
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-La API estará disponible en `http://127.0.0.1:8000`
+API:
 
-Documentación interactiva: `http://127.0.0.1:8000/docs`
-
-## Autenticación
-
-### Registrar usuario
-
-```bash
-curl -X POST http://127.0.0.1:8000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "nuevo@parmenia.pe",
-    "password": "123456",
-    "full_name": "Nuevo Usuario",
-    "faculty": "Ingenieria",
-    "skills": ["Python", "React"],
-    "role": "emprendedor"
-  }'
+```text
+http://127.0.0.1:8000
 ```
 
-### Iniciar sesión
+Swagger:
 
-```bash
-curl -X POST http://127.0.0.1:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@parmenia.pe",
-    "password": "admin123"
-  }'
+```text
+http://127.0.0.1:8000/docs
 ```
 
-Respuesta:
+## Ejecutar Frontend
 
-```json
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend:
+
+```text
+http://localhost:5173
+```
+
+## OAuth2 con Google
+
+El frontend carga Google Identity Services. Cuando el usuario inicia sesion con Google, el frontend recibe un `credential` de Google y lo envia al backend:
+
+```http
+POST /auth/oauth/google
+Content-Type: application/json
+
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "token_type": "bearer",
-  "user": { ... }
+  "credential": "<google_id_token>"
 }
 ```
 
-### Usar el token
+El backend valida ese token con Google usando `GOOGLE_CLIENT_ID`.
 
-```bash
-curl -X GET http://127.0.0.1:8000/profiles/ \
-  -H "Authorization: Bearer AQUI_EL_TOKEN"
+Si el usuario no existe, se crea un perfil local con rol:
+
+```text
+emprendedor
 ```
 
-## Usuarios de prueba
+Luego el backend devuelve el JWT local de la API:
 
-| Email                     | Password  | Rol         |
-| ------------------------- | --------- | ----------- |
-| admin@parmenia.pe         | admin123  | admin       |
-| carlos.mentor@parmenia.pe | mentor123 | mentor      |
-| ana.mentor@parmenia.pe    | mentor456 | mentor      |
-| luis.emp@parmenia.pe      | emp123    | emprendedor |
-| maria.emp@parmenia.pe     | emp456    | emprendedor |
-| pedro.emp@parmenia.pe     | emp789    | emprendedor |
-| sofia.emp@parmenia.pe     | emp012    | emprendedor |
+```json
+{
+  "access_token": "...",
+  "token_type": "bearer",
+  "user": {}
+}
+```
 
-## Endpoints
+Desde ese momento, el frontend consume todos los endpoints protegidos con:
 
-### Autenticación
+```http
+Authorization: Bearer <access_token>
+```
 
-| Método | Ruta             | Descripción                    | Roles       |
-| ------ | ---------------- | ------------------------------ | ----------- |
-| POST   | `/auth/register` | Registrar nuevo usuario        | Público     |
-| POST   | `/auth/login`    | Iniciar sesión                 | Público     |
-| GET    | `/auth/me`       | Perfil del usuario autenticado | Autenticado |
+## Endpoints Cubiertos por el Frontend
+
+### Autenticacion
+
+| Metodo | Ruta | Descripcion |
+| --- | --- | --- |
+| POST | `/auth/register` | Registro local |
+| POST | `/auth/login` | Login local |
+| POST | `/auth/oauth/google` | Login con Google OAuth2 |
+| GET | `/auth/me` | Usuario autenticado |
 
 ### Perfiles
 
-| Método | Ruta             | Descripción           | Roles          |
-| ------ | ---------------- | --------------------- | -------------- |
-| GET    | `/profiles/`     | Listar perfiles       | Autenticado    |
-| GET    | `/profiles/{id}` | Obtener perfil por ID | Autenticado    |
-| POST   | `/profiles/`     | Crear perfil          | Admin          |
-| PUT    | `/profiles/{id}` | Actualizar perfil     | Admin / Propio |
-| DELETE | `/profiles/{id}` | Eliminar perfil       | Admin          |
+| Metodo | Ruta |
+| --- | --- |
+| GET | `/profiles/` |
+| GET | `/profiles/{id}` |
+| POST | `/profiles/` |
+| PUT | `/profiles/{id}` |
+| DELETE | `/profiles/{id}` |
 
 ### Fases
 
-| Método | Ruta           | Descripción         | Roles       |
-| ------ | -------------- | ------------------- | ----------- |
-| GET    | `/phases/`     | Listar fases        | Autenticado |
-| GET    | `/phases/{id}` | Obtener fase por ID | Autenticado |
-| POST   | `/phases/`     | Crear fase          | Admin       |
-| PUT    | `/phases/{id}` | Actualizar fase     | Admin       |
-| DELETE | `/phases/{id}` | Eliminar fase       | Admin       |
+| Metodo | Ruta |
+| --- | --- |
+| GET | `/phases/` |
+| GET | `/phases/{id}` |
+| POST | `/phases/` |
+| PUT | `/phases/{id}` |
+| DELETE | `/phases/{id}` |
 
 ### Convocatorias
 
-| Método | Ruta            | Descripción             | Roles       |
-| ------ | --------------- | ----------------------- | ----------- |
-| GET    | `/cohorts/`     | Listar convocatorias    | Autenticado |
-| GET    | `/cohorts/{id}` | Obtener convocatoria    | Autenticado |
-| POST   | `/cohorts/`     | Crear convocatoria      | Admin       |
-| PUT    | `/cohorts/{id}` | Actualizar convocatoria | Admin       |
-| DELETE | `/cohorts/{id}` | Eliminar convocatoria   | Admin       |
+| Metodo | Ruta |
+| --- | --- |
+| GET | `/cohorts/` |
+| GET | `/cohorts/{id}` |
+| POST | `/cohorts/` |
+| PUT | `/cohorts/{id}` |
+| DELETE | `/cohorts/{id}` |
 
 ### Inscripciones
 
-| Método | Ruta                       | Descripción                  | Roles       |
-| ------ | -------------------------- | ---------------------------- | ----------- |
-| GET    | `/enrollments/`            | Listar inscripciones         | Autenticado |
-| GET    | `/enrollments/{id}`        | Obtener inscripción          | Autenticado |
-| POST   | `/enrollments/`            | Inscribirse a convocatoria   | Emprendedor |
-| PUT    | `/enrollments/{id}`        | Actualizar inscripción       | Admin       |
-| PUT    | `/enrollments/{id}/status` | Aceptar/rechazar inscripción | Admin       |
-| DELETE | `/enrollments/{id}`        | Eliminar inscripción         | Admin       |
+| Metodo | Ruta |
+| --- | --- |
+| GET | `/enrollments/` |
+| GET | `/enrollments/{id}` |
+| POST | `/enrollments/` |
+| PUT | `/enrollments/{id}` |
+| PUT | `/enrollments/{id}/status` |
+| DELETE | `/enrollments/{id}` |
 
 ### Proyectos
 
-| Método | Ruta                                 | Descripción                     | Roles         |
-| ------ | ------------------------------------ | ------------------------------- | ------------- |
-| GET    | `/projects/`                         | Listar proyectos                | Autenticado   |
-| GET    | `/projects/{id}`                     | Detalle con miembros y mentores | Autenticado   |
-| POST   | `/projects/`                         | Crear proyecto                  | Emprendedor   |
-| PUT    | `/projects/{id}`                     | Actualizar proyecto             | Admin / Líder |
-| DELETE | `/projects/{id}`                     | Eliminar proyecto               | Admin         |
-| POST   | `/projects/{id}/members`             | Agregar miembro                 | Admin / Líder |
-| GET    | `/projects/{id}/members`             | Listar miembros                 | Autenticado   |
-| DELETE | `/projects/{id}/members/{user_id}`   | Remover miembro                 | Admin / Líder |
-| POST   | `/projects/{id}/mentors`             | Asignar mentor                  | Admin         |
-| GET    | `/projects/{id}/mentors`             | Listar mentores                 | Autenticado   |
-| DELETE | `/projects/{id}/mentors/{mentor_id}` | Desasignar mentor               | Admin         |
+| Metodo | Ruta |
+| --- | --- |
+| GET | `/projects/` |
+| GET | `/projects/{id}` |
+| POST | `/projects/` |
+| PUT | `/projects/{id}` |
+| DELETE | `/projects/{id}` |
+| GET | `/projects/{id}/members` |
+| POST | `/projects/{id}/members` |
+| DELETE | `/projects/{id}/members/{user_id}` |
+| GET | `/projects/{id}/mentors` |
+| POST | `/projects/{id}/mentors` |
+| DELETE | `/projects/{id}/mentors/{mentor_id}` |
 
 ### Publicaciones
 
-| Método | Ruta          | Descripción            | Roles          |
-| ------ | ------------- | ---------------------- | -------------- |
-| GET    | `/posts/`     | Listar publicaciones   | Autenticado    |
-| GET    | `/posts/{id}` | Obtener publicación    | Autenticado    |
-| POST   | `/posts/`     | Crear publicación      | Admin / Mentor |
-| PUT    | `/posts/{id}` | Actualizar publicación | Admin / Autor  |
-| DELETE | `/posts/{id}` | Eliminar publicación   | Admin / Autor  |
+| Metodo | Ruta |
+| --- | --- |
+| GET | `/posts/` |
+| GET | `/posts/{id}` |
+| POST | `/posts/` |
+| PUT | `/posts/{id}` |
+| DELETE | `/posts/{id}` |
 
-### Entregables
+### Entregables y Revisiones
 
-| Método | Ruta                          | Descripción           | Roles                |
-| ------ | ----------------------------- | --------------------- | -------------------- |
-| GET    | `/projects/{id}/deliverables` | Listar entregables    | Autenticado          |
-| GET    | `/deliverables/{id}`          | Obtener entregable    | Autenticado          |
-| POST   | `/projects/{id}/deliverables` | Subir entregable      | Miembro del proyecto |
-| PUT    | `/deliverables/{id}`          | Actualizar entregable | Admin / Subidor      |
-| DELETE | `/deliverables/{id}`          | Eliminar entregable   | Admin / Subidor      |
+| Metodo | Ruta |
+| --- | --- |
+| GET | `/projects/{id}/deliverables` |
+| POST | `/projects/{id}/deliverables` |
+| GET | `/deliverables/{id}` |
+| PUT | `/deliverables/{id}` |
+| DELETE | `/deliverables/{id}` |
+| GET | `/deliverables/{id}/reviews` |
+| POST | `/deliverables/{id}/reviews` |
+| GET | `/reviews/{id}` |
+| PUT | `/reviews/{id}` |
+| DELETE | `/reviews/{id}` |
 
-### Revisiones de Entregables
+### Reportes
 
-| Método | Ruta                         | Descripción         | Roles                  |
-| ------ | ---------------------------- | ------------------- | ---------------------- |
-| GET    | `/deliverables/{id}/reviews` | Listar revisiones   | Autenticado            |
-| GET    | `/reviews/{id}`              | Obtener revisión    | Autenticado            |
-| POST   | `/deliverables/{id}/reviews` | Crear revisión      | Mentor asignado        |
-| PUT    | `/reviews/{id}`              | Actualizar revisión | Admin / Mentor revisor |
-| DELETE | `/reviews/{id}`              | Eliminar revisión   | Admin                  |
+| Metodo | Ruta |
+| --- | --- |
+| GET | `/reports/dashboard` |
+| GET | `/reports/cohort/{cohort_id}/progress` |
 
-## Estructura del proyecto
+## Usuarios de Prueba
 
-```
-app/
-├── __init__.py
-├── main.py              # Aplicación FastAPI, inclusión de routers
-├── auth.py              # Autenticación JWT, roles, permisos
-├── database.py          # Conexión a PostgreSQL
-├── models.py            # Modelos SQLAlchemy (10 tablas)
-├── schemas.py           # Schemas Pydantic (entrada/salida)
-└── routers/
-    ├── __init__.py
-    ├── auth.py           # Register, Login, Me
-    ├── profiles.py       # CRUD perfiles
-    ├── phases.py         # CRUD fases
-    ├── cohorts.py        # CRUD convocatorias
-    ├── enrollments.py    # CRUD inscripciones
-    ├── projects.py       # CRUD proyectos + miembros + mentores
-    ├── posts.py          # CRUD publicaciones
-    └── deliverables.py   # CRUD entregables + revisiones
-```
+| Email | Password | Rol |
+| --- | --- | --- |
+| `admin@parmenia.pe` | `admin123` | admin |
+| `carlos.mentor@parmenia.pe` | `mentor123` | mentor |
+| `ana.mentor@parmenia.pe` | `mentor456` | mentor |
+| `luis.emp@parmenia.pe` | `emp123` | emprendedor |
+| `maria.emp@parmenia.pe` | `emp456` | emprendedor |
+| `pedro.emp@parmenia.pe` | `emp789` | emprendedor |
+| `sofia.emp@parmenia.pe` | `emp012` | emprendedor |

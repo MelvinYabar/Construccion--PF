@@ -5,12 +5,18 @@ env/
 my_env/
 # variables secretas
 .env
+frontend/.env
 
 # python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
 
 # vscode
 .vscode/

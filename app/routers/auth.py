@@ -1,4 +1,8 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token
 from sqlalchemy.orm import Session
 
 from app import models, schemas
@@ -57,6 +61,70 @@ def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contrasena incorrectos",
         )
+
+    token = create_access_token(profile.id, profile.role.value)
+
+    return schemas.AuthResponse(
+        access_token=token,
+        token_type="bearer",
+        user=schemas.ProfileResponse.model_validate(profile),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GOOGLE OAUTH2 / OIDC
+# ---------------------------------------------------------------------------
+
+@router.post("/oauth/google", response_model=schemas.AuthResponse)
+def login_with_google(payload: schemas.GoogleOAuthRequest, db: Session = Depends(get_db)):
+    """Valida el ID token de Google y devuelve el JWT local de la API."""
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if not google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GOOGLE_CLIENT_ID is not configured",
+        )
+
+    try:
+        claims = id_token.verify_oauth2_token(
+            payload.credential,
+            google_requests.Request(),
+            google_client_id,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google token invalido o expirado",
+        ) from None
+
+    email = claims.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google token does not include email",
+        )
+
+    profile = db.query(models.Profile).filter(models.Profile.email == email).first()
+    if profile is None:
+        profile = models.Profile(
+            email=email,
+            password="oauth2-google",
+            full_name=claims.get("name"),
+            faculty=None,
+            skills=[],
+            role=models.UserRole.emprendedor,
+        )
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+    else:
+        updated = False
+        if claims.get("name") and not profile.full_name:
+            profile.full_name = claims["name"]
+            updated = True
+        if updated:
+            db.commit()
+            db.refresh(profile)
 
     token = create_access_token(profile.id, profile.role.value)
 

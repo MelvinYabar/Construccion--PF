@@ -45,6 +45,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleOAuthRequest(BaseModel):
+    credential: str
+
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
