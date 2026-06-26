@@ -6,7 +6,7 @@ from google.oauth2 import id_token
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.auth import create_access_token
+from app.auth import create_access_token, get_current_user
 from app.database import get_db
 
 
@@ -140,6 +140,6 @@ def login_with_google(payload: schemas.GoogleOAuthRequest, db: Session = Depends
 # ---------------------------------------------------------------------------
 
 @router.get("/me", response_model=schemas.ProfileResponse)
-def get_me(current_user: schemas.AuthenticatedUser = Depends(schemas.get_current_user_dep)):
+def get_me(current_user: schemas.AuthenticatedUser = Depends(get_current_user)):
     """Devuelve el perfil del usuario autenticado."""
     return current_user
