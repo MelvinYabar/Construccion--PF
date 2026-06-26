@@ -273,8 +273,80 @@ async function loadCohortReport() {
 function formatValue(value) {
   if (value === null || value === undefined) return '-'
   if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'object') return JSON.stringify(value)
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .map(([key, nestedValue]) => `${formatLabel(key)}: ${formatValue(nestedValue)}`)
+      .join(' | ')
+  }
   return String(value)
+}
+
+function formatLabel(key) {
+  const labels = {
+    id: 'ID',
+    email: 'Email',
+    full_name: 'Nombre',
+    faculty: 'Facultad',
+    skills: 'Habilidades',
+    role: 'Rol',
+    created_at: 'Creado',
+    name: 'Nombre',
+    title: 'Titulo',
+    content: 'Contenido',
+    description: 'Descripcion',
+    start_date: 'Inicio',
+    end_date: 'Fin',
+    order: 'Orden',
+    status: 'Estado',
+    user_id: 'Usuario',
+    cohort_id: 'Convocatoria',
+    enrollment_date: 'Fecha',
+    leader_id: 'Lider',
+    current_phase_id: 'Fase actual',
+    phase_id: 'Fase',
+    project_id: 'Proyecto',
+    mentor_id: 'Mentor',
+    uploaded_by: 'Subido por',
+    file_url: 'Archivo',
+    feedback: 'Feedback',
+    reviewed_at: 'Revisado',
+    is_published: 'Publicado',
+    published_at: 'Publicado en',
+    access_token: 'Token',
+    token_type: 'Tipo',
+    message: 'Mensaje',
+  }
+
+  return labels[key] || key.replaceAll('_', ' ')
+}
+
+function importantFields(resource, item) {
+  const fieldsByResource = {
+    profiles: ['full_name', 'email', 'role', 'faculty', 'skills'],
+    phases: ['name', 'order'],
+    cohorts: ['name', 'description', 'start_date', 'end_date'],
+    enrollments: ['status', 'cohort_id', 'user_id', 'enrollment_date'],
+    projects: ['name', 'description', 'cohort_id', 'leader_id', 'current_phase_id'],
+    posts: ['title', 'content', 'is_published', 'published_at'],
+    deliverables: ['file_url', 'project_id', 'phase_id', 'uploaded_by', 'created_at'],
+    reviews: ['status', 'feedback', 'mentor_id', 'reviewed_at'],
+  }
+
+  const fields = fieldsByResource[resource?.key] || Object.keys(item || {})
+  return fields
+    .filter((field) => item?.[field] !== undefined && item?.[field] !== null && item?.[field] !== '')
+    .map((field) => ({ label: formatLabel(field), value: formatValue(item[field]) }))
+}
+
+function summaryTitle(item) {
+  return item?.full_name || item?.name || item?.title || item?.email || item?.status || item?.file_url || 'Registro'
+}
+
+function summarySubtitle(resource, item) {
+  const role = item?.role ? `Rol: ${item.role}` : ''
+  const status = item?.status ? `Estado: ${item.status}` : ''
+  const id = item?.[resource?.idField] ? `ID: ${item[resource.idField]}` : ''
+  return [role, status, id].filter(Boolean).join(' · ')
 }
 
 function renderGoogleButton() {
@@ -366,19 +438,43 @@ onMounted(async () => {
         <article class="panel">
           <h2>Mi perfil</h2>
           <button @click="refreshMe">Actualizar /auth/me</button>
-          <pre>{{ user }}</pre>
+          <dl class="detail-list">
+            <template v-for="entry in importantFields({ key: 'profiles' }, user)" :key="entry.label">
+              <dt>{{ entry.label }}</dt>
+              <dd>{{ entry.value }}</dd>
+            </template>
+          </dl>
         </article>
 
         <article class="panel">
           <h2>Salud API</h2>
           <button @click="loadHealth">GET /health</button>
-          <pre>{{ reports.health }}</pre>
+          <p v-if="reports.health" class="status-pill">API activa</p>
+          <p v-else class="muted">Aun no se consulto el estado.</p>
         </article>
 
         <article v-if="isAdmin" class="panel">
           <h2>Reporte admin</h2>
           <button @click="loadDashboardReport">GET /reports/dashboard</button>
-          <pre>{{ reports.dashboard }}</pre>
+          <div v-if="reports.dashboard" class="metric-grid">
+            <div class="metric">
+              <span>Usuarios</span>
+              <strong>{{ reports.dashboard.total_users }}</strong>
+            </div>
+            <div class="metric">
+              <span>Inscripciones</span>
+              <strong>{{ reports.dashboard.total_enrollments }}</strong>
+            </div>
+            <div class="metric">
+              <span>Proyectos</span>
+              <strong>{{ reports.dashboard.total_projects }}</strong>
+            </div>
+            <div class="metric">
+              <span>Entregables pendientes</span>
+              <strong>{{ reports.dashboard.pending_deliverables }}</strong>
+            </div>
+          </div>
+          <p v-else class="muted">Carga el reporte para ver los indicadores.</p>
         </article>
 
         <article v-if="isAdmin || isMentor" class="panel wide">
@@ -387,7 +483,27 @@ onMounted(async () => {
             <input v-model="reports.cohortId" placeholder="ID de cohorte" />
             <button @click="loadCohortReport">GET /reports/cohort/{id}/progress</button>
           </div>
-          <pre>{{ reports.cohortProgress }}</pre>
+          <div v-if="reports.cohortProgress">
+            <h3>{{ reports.cohortProgress.cohort_name }}</h3>
+            <p class="muted">Total de proyectos: {{ reports.cohortProgress.total_projects }}</p>
+            <div class="cards">
+              <article v-for="project in reports.cohortProgress.projects" :key="project.project_id" class="record-card">
+                <h3>{{ project.project_name }}</h3>
+                <p>{{ project.current_phase }} · {{ project.progress_percentage }}%</p>
+                <dl class="detail-list compact">
+                  <dt>Lider</dt>
+                  <dd>{{ project.leader_name || '-' }}</dd>
+                  <dt>Miembros</dt>
+                  <dd>{{ project.member_count }}</dd>
+                  <dt>Entregables</dt>
+                  <dd>{{ project.deliverable_count }}</dd>
+                  <dt>Aprobados</dt>
+                  <dd>{{ project.reviews_approved }}</dd>
+                </dl>
+              </article>
+            </div>
+          </div>
+          <p v-else class="muted">Ingresa una cohorte para ver su progreso.</p>
         </article>
       </section>
 
@@ -436,23 +552,23 @@ onMounted(async () => {
           </form>
         </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Resumen</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in stateFor(activeResource).items" :key="item[activeResource.idField]">
-                <td><code>{{ item[activeResource.idField] }}</code></td>
-                <td>
-                  <strong>{{ item.name || item.title || item.email || item.status || item.file_url || 'Registro' }}</strong>
-                  <pre>{{ item }}</pre>
-                </td>
-                <td>
+        <div class="cards">
+          <article v-for="item in stateFor(activeResource).items" :key="item[activeResource.idField]" class="record-card">
+            <div class="record-head">
+              <div>
+                <h3>{{ summaryTitle(item) }}</h3>
+                <p>{{ summarySubtitle(activeResource, item) }}</p>
+              </div>
+            </div>
+
+            <dl class="detail-list">
+              <template v-for="entry in importantFields(activeResource, item)" :key="entry.label">
+                <dt>{{ entry.label }}</dt>
+                <dd>{{ entry.value }}</dd>
+              </template>
+            </dl>
+
+            <div class="record-actions">
                   <button @click="stateFor(activeResource).selectedId = item[activeResource.idField]; getResource(activeResource)">Ver</button>
                   <button v-if="activeResource.canDelete && canAccessResource(activeResource, 'delete')" class="danger" @click="deleteResource(activeResource, item[activeResource.idField])">Eliminar</button>
                   <div v-for="action in (activeResource.customActions || []).filter(canRunAction)" :key="action.key" class="action-box">
@@ -469,15 +585,30 @@ onMounted(async () => {
                     </template>
                     <button @click="runAction(activeResource, action, item)">{{ action.label }}</button>
                   </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            </div>
+          </article>
         </div>
 
         <article class="panel">
           <h2>Resultado</h2>
-          <pre>{{ stateFor(activeResource).actionResult }}</pre>
+          <dl v-if="stateFor(activeResource).actionResult && !Array.isArray(stateFor(activeResource).actionResult)" class="detail-list">
+            <template v-for="entry in importantFields(activeResource, stateFor(activeResource).actionResult)" :key="entry.label">
+              <dt>{{ entry.label }}</dt>
+              <dd>{{ entry.value }}</dd>
+            </template>
+          </dl>
+          <div v-else-if="Array.isArray(stateFor(activeResource).actionResult)" class="cards">
+            <article v-for="(item, index) in stateFor(activeResource).actionResult" :key="item.id || index" class="record-card">
+              <h3>{{ summaryTitle(item) }}</h3>
+              <dl class="detail-list">
+                <template v-for="entry in importantFields(activeResource, item)" :key="entry.label">
+                  <dt>{{ entry.label }}</dt>
+                  <dd>{{ entry.value }}</dd>
+                </template>
+              </dl>
+            </article>
+          </div>
+          <p v-else class="muted">Aqui aparecera el resultado de la accion seleccionada.</p>
         </article>
       </section>
     </main>
