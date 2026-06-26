@@ -48,9 +48,13 @@ Configura:
 DATABASE_URL=postgresql://user:password@host:5432/database
 JWT_SECRET=parmenia-dev-secret-change-in-production
 GOOGLE_CLIENT_ID=paste-your-google-client-id.apps.googleusercontent.com
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=paste-your-service-role-key
 ```
 
 `GOOGLE_CLIENT_ID` debe ser el Client ID del OAuth Client creado en Google Cloud.
+
+`SUPABASE_SERVICE_ROLE_KEY` solo debe existir en el backend. Nunca debe ponerse en el frontend ni subirse a GitHub.
 
 ## Configuracion Frontend
 
@@ -117,6 +121,13 @@ Si el usuario no existe, se crea un perfil local con rol:
 
 ```text
 emprendedor
+```
+
+Ademas, el backend sincroniza el usuario con **Supabase Authentication > Users** usando la Auth Admin API de Supabase. Para eso se usan estas variables:
+
+```env
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=paste-your-service-role-key
 ```
 
 Luego el backend devuelve el JWT local de la API:

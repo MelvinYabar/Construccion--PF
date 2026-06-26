@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.auth import create_access_token, get_current_user
 from app.database import get_db
+from app.supabase_auth import create_supabase_auth_user
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -32,6 +33,13 @@ def register(user_in: schemas.RegisterRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Ya existe un usuario con ese email",
         )
+
+    create_supabase_auth_user(
+        email=user_in.email,
+        password=user_in.password,
+        full_name=user_in.full_name,
+        role=user_in.role.value,
+    )
 
     profile = models.Profile(
         email=user_in.email,
@@ -112,6 +120,12 @@ def login_with_google(payload: schemas.GoogleOAuthRequest, db: Session = Depends
 
     profile = db.query(models.Profile).filter(models.Profile.email == email).first()
     if profile is None:
+        create_supabase_auth_user(
+            email=email,
+            full_name=claims.get("name"),
+            role=models.UserRole.emprendedor.value,
+        )
+
         profile = models.Profile(
             email=email,
             password="oauth2-google",
