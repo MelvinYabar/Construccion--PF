@@ -24,7 +24,6 @@ const publicRegisterRoles = ['emprendedor', 'mentor']
 
 const resourceState = reactive({})
 const reports = reactive({
-  health: null,
   dashboard: null,
   cohortId: '',
   cohortProgress: null,
@@ -261,10 +260,6 @@ async function loadDashboardReport() {
   reports.dashboard = await safeRun(() => apiRequest('/reports/dashboard'))
 }
 
-async function loadHealth() {
-  reports.health = await safeRun(() => apiRequest('/health'))
-}
-
 async function loadCohortReport() {
   if (!reports.cohortId) return setMessage('Ingresa el ID de cohorte', 'error')
   reports.cohortProgress = await safeRun(() => apiRequest(`/reports/cohort/${reports.cohortId}/progress`))
@@ -444,13 +439,6 @@ onMounted(async () => {
               <dd>{{ entry.value }}</dd>
             </template>
           </dl>
-        </article>
-
-        <article class="panel">
-          <h2>Salud API</h2>
-          <button @click="loadHealth">GET /health</button>
-          <p v-if="reports.health" class="status-pill">API activa</p>
-          <p v-else class="muted">Aun no se consulto el estado.</p>
         </article>
 
         <article v-if="isAdmin" class="panel">
