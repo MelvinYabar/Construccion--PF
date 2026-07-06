@@ -62,6 +62,25 @@ const roleLabels = {
   emprendedor: 'Emprendedor',
 }
 
+const viewIcons = {
+  dashboard: '🏛️',
+  profiles: '👥',
+  phases: '🧭',
+  cohorts: '📣',
+  enrollments: '📝',
+  projects: '🚀',
+  posts: '📰',
+  deliverables: '📎',
+  reviews: '✅',
+  calendar: '📅',
+  login: '🔐',
+  register: '✨',
+  google: '🌐',
+  create: '➕',
+  update: '✏️',
+  result: '📌',
+}
+
 function canAccessResource(resource, action) {
   if (!user.value) return false
   if (isAdmin.value) return true
@@ -119,6 +138,10 @@ function setMessage(message, type = 'notice') {
 
 function roleLabel(role) {
   return roleLabels[role] || role || '-'
+}
+
+function iconFor(key) {
+  return viewIcons[key] || '•'
 }
 
 function badgeClass(value) {
@@ -462,8 +485,12 @@ onMounted(async () => {
       </div>
 
       <nav v-if="isAuthenticated">
-        <button :class="{ active: activeKey === 'dashboard' }" @click="activeKey = 'dashboard'">Dashboard</button>
+        <button :class="{ active: activeKey === 'dashboard' }" @click="activeKey = 'dashboard'">
+          <span class="nav-icon">{{ iconFor('dashboard') }}</span>
+          Dashboard
+        </button>
         <button v-for="resource in visibleResources" :key="resource.key" :class="{ active: activeKey === resource.key }" @click="activeKey = resource.key">
+          <span class="nav-icon">{{ iconFor(resource.key) }}</span>
           {{ resource.title }}
         </button>
       </nav>
@@ -478,7 +505,10 @@ onMounted(async () => {
     <main>
       <header class="topbar">
         <div>
-          <h1>{{ activeResource?.title || 'Dashboard' }}</h1>
+          <h1>
+            <span class="title-icon">{{ iconFor(activeResource?.key || 'dashboard') }}</span>
+            {{ activeResource?.title || 'Dashboard' }}
+          </h1>
           <p v-if="user">{{ resourceDescriptions[activeKey] || `Bienvenido, ${sessionName}. Revisa el avance de Parmenia desde un solo panel.` }}</p>
           <p v-else>Plataforma para acompanar proyectos desde la postulacion hasta la incubacion.</p>
         </div>
@@ -505,7 +535,7 @@ onMounted(async () => {
         </div>
 
         <form class="panel auth-panel" @submit.prevent="login">
-          <h2>Iniciar sesion</h2>
+          <h2><span class="section-icon">{{ iconFor('login') }}</span>Iniciar sesion</h2>
           <label>Email<input v-model="loginForm.email" type="email" required /></label>
           <label>Password<input v-model="loginForm.password" type="password" required /></label>
           <button type="submit">Ingresar</button>
@@ -513,7 +543,7 @@ onMounted(async () => {
         </form>
 
         <form class="panel auth-panel" @submit.prevent="register">
-          <h2>Crear cuenta</h2>
+          <h2><span class="section-icon">{{ iconFor('register') }}</span>Crear cuenta</h2>
           <label>Email<input v-model="registerForm.email" type="email" required /></label>
           <label>Password<input v-model="registerForm.password" type="password" required /></label>
           <label>Nombre<input v-model="registerForm.full_name" /></label>
@@ -528,7 +558,7 @@ onMounted(async () => {
         </form>
 
         <div class="panel auth-panel">
-          <h2>OAuth2 con Google</h2>
+          <h2><span class="section-icon">{{ iconFor('google') }}</span>OAuth2 con Google</h2>
           <p>Valida tu identidad con Google y obtiene un JWT local para consumir la API.</p>
           <div id="googleButton" class="google-slot"></div>
           <p v-if="!googleClientId" class="error">Configura VITE_GOOGLE_CLIENT_ID en frontend/.env</p>
@@ -537,7 +567,7 @@ onMounted(async () => {
 
       <section v-else-if="activeKey === 'dashboard'" class="grid">
         <article class="panel">
-          <h2>Mi perfil</h2>
+          <h2><span class="section-icon">{{ iconFor('profiles') }}</span>Mi perfil</h2>
           <button class="secondary" @click="refreshMe">Actualizar perfil</button>
           <dl class="detail-list">
             <template v-for="entry in importantFields({ key: 'profiles' }, user)" :key="entry.label">
@@ -551,7 +581,7 @@ onMounted(async () => {
         </article>
 
         <article v-if="isAdmin" class="panel">
-          <h2>Reporte admin</h2>
+          <h2><span class="section-icon">{{ iconFor('dashboard') }}</span>Reporte admin</h2>
           <button @click="loadDashboardReport">Cargar indicadores</button>
           <div v-if="reports.dashboard" class="metric-grid">
             <div class="metric">
@@ -575,7 +605,7 @@ onMounted(async () => {
         </article>
 
         <article v-if="isAdmin || isMentor" class="panel wide">
-          <h2>Reporte por cohorte</h2>
+          <h2><span class="section-icon">{{ iconFor('cohorts') }}</span>Reporte por cohorte</h2>
           <div class="inline">
             <input v-model="reports.cohortId" placeholder="ID de cohorte" />
             <button @click="loadCohortReport">Ver progreso</button>
@@ -604,7 +634,7 @@ onMounted(async () => {
         </article>
 
         <article class="panel wide">
-          <h2>Agendar mentoria con Google Calendar</h2>
+          <h2><span class="section-icon">{{ iconFor('calendar') }}</span>Agendar mentoria con Google Calendar</h2>
           <div class="grid">
             <label>Titulo<input v-model="mentorshipForm.title" /></label>
             <label>Invitados<input v-model="mentorshipForm.attendee_emails" placeholder="correo1@gmail.com, correo2@gmail.com" /></label>
@@ -636,7 +666,7 @@ onMounted(async () => {
       <section v-else-if="activeResource" class="resource">
         <div class="toolbar">
           <div class="toolbar-copy">
-            <strong>{{ activeResource.title }}</strong>
+            <strong><span class="section-icon">{{ iconFor(activeResource.key) }}</span>{{ activeResource.title }}</strong>
             <p>{{ resourceDescriptions[activeResource.key] }}</p>
           </div>
           <div class="toolbar-actions">
@@ -649,7 +679,7 @@ onMounted(async () => {
 
         <div class="grid">
           <form v-if="activeResource.canCreate && canAccessResource(activeResource, 'create')" class="panel" @submit.prevent="createResource(activeResource)">
-            <h2>Crear</h2>
+            <h2><span class="section-icon">{{ iconFor('create') }}</span>Crear</h2>
             <template v-for="field in activeResource.createFields" :key="field.name">
               <label>
                 {{ field.label }}
@@ -666,7 +696,7 @@ onMounted(async () => {
           </form>
 
           <form v-if="activeResource.canUpdate && canAccessResource(activeResource, 'update')" class="panel" @submit.prevent="updateResource(activeResource)">
-            <h2>Actualizar</h2>
+            <h2><span class="section-icon">{{ iconFor('update') }}</span>Actualizar</h2>
             <label>ID<input v-model="stateFor(activeResource).updateId" required /></label>
             <template v-for="field in activeResource.updateFields" :key="field.name">
               <label>
@@ -729,7 +759,7 @@ onMounted(async () => {
         </div>
 
         <article class="panel">
-          <h2>Resultado</h2>
+          <h2><span class="section-icon">{{ iconFor('result') }}</span>Resultado</h2>
           <dl v-if="stateFor(activeResource).actionResult && !Array.isArray(stateFor(activeResource).actionResult)" class="detail-list">
             <template v-for="entry in importantFields(activeResource, stateFor(activeResource).actionResult)" :key="entry.label">
               <dt>{{ entry.label }}</dt>

@@ -185,6 +185,7 @@ code {
 }
 
 .sidebar nav button {
+  align-items: center;
   justify-content: flex-start;
   background: transparent;
   border-color: transparent;
@@ -192,6 +193,32 @@ code {
   min-height: 44px;
   padding: 0 14px;
   text-align: left;
+}
+
+.nav-icon,
+.section-icon,
+.title-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.nav-icon {
+  font-size: 18px;
+  margin-right: 9px;
+  width: 22px;
+}
+
+.title-icon {
+  font-size: 32px;
+  margin-right: 10px;
+  vertical-align: -2px;
+}
+
+.section-icon {
+  font-size: 20px;
+  margin-right: 8px;
+  vertical-align: -2px;
 }
 
 .sidebar nav button.active,
@@ -235,6 +262,8 @@ main {
 }
 
 .topbar h1 {
+  align-items: center;
+  display: flex;
   font-size: clamp(28px, 4vw, 40px);
   letter-spacing: 0;
   line-height: 1.05;
@@ -360,6 +389,8 @@ main {
 .panel h2,
 .panel h3,
 .record-card h3 {
+  align-items: center;
+  display: flex;
   margin: 0 0 12px;
 }
 
@@ -398,7 +429,8 @@ main {
 }
 
 .toolbar-copy strong {
-  display: block;
+  align-items: center;
+  display: flex;
 }
 
 .toolbar-copy p {
