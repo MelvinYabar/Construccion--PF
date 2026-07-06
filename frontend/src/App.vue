@@ -538,7 +538,7 @@ onMounted(async () => {
       <section v-else-if="activeKey === 'dashboard'" class="grid">
         <article class="panel">
           <h2>Mi perfil</h2>
-          <button @click="refreshMe">Actualizar /auth/me</button>
+          <button class="secondary" @click="refreshMe">Actualizar perfil</button>
           <dl class="detail-list">
             <template v-for="entry in importantFields({ key: 'profiles' }, user)" :key="entry.label">
               <dt>{{ entry.label }}</dt>
@@ -552,7 +552,7 @@ onMounted(async () => {
 
         <article v-if="isAdmin" class="panel">
           <h2>Reporte admin</h2>
-          <button @click="loadDashboardReport">GET /reports/dashboard</button>
+          <button @click="loadDashboardReport">Cargar indicadores</button>
           <div v-if="reports.dashboard" class="metric-grid">
             <div class="metric">
               <span>Usuarios</span>
@@ -578,7 +578,7 @@ onMounted(async () => {
           <h2>Reporte por cohorte</h2>
           <div class="inline">
             <input v-model="reports.cohortId" placeholder="ID de cohorte" />
-            <button @click="loadCohortReport">GET /reports/cohort/{id}/progress</button>
+            <button @click="loadCohortReport">Ver progreso</button>
           </div>
           <div v-if="reports.cohortProgress">
             <h3>{{ reports.cohortProgress.cohort_name }}</h3>
@@ -616,7 +616,7 @@ onMounted(async () => {
             <input v-model="mentorshipForm.create_meet" type="checkbox" />
             Crear enlace de Google Meet
           </label>
-          <button @click="scheduleMentorshipWithGoogle">Autorizar y agendar</button>
+          <button @click="scheduleMentorshipWithGoogle">Agendar mentoría</button>
 
           <div v-if="mentorshipResult" class="calendar-result">
             <h3>{{ mentorshipResult.title }}</h3>
