@@ -477,24 +477,30 @@ main {
 
 .record-actions {
   border-top: 1px solid var(--line);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  gap: 12px;
   margin-top: 14px;
   padding-top: 12px;
 }
 
-.record-actions > button {
-  min-width: 112px;
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.record-actions .action-box {
-  flex: 1 1 260px;
-  min-width: 240px;
+.quick-actions button {
+  min-width: 136px;
 }
 
-.action-box button {
-  justify-self: start;
+.button-icon {
+  margin-right: 7px;
+}
+
+.action-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
 }
 
 .detail-list {
@@ -598,11 +604,28 @@ main {
 }
 
 .action-box {
-  border-top: 1px solid var(--line);
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   display: grid;
   gap: 9px;
-  margin-top: 8px;
-  padding-top: 8px;
+  padding: 12px;
+}
+
+.action-box button {
+  justify-self: stretch;
+}
+
+.action-title {
+  align-items: center;
+  color: var(--text);
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.action-title strong {
+  font-weight: 800;
 }
 
 .calendar-result {
@@ -675,7 +698,8 @@ main {
     width: 100%;
   }
 
-  .record-actions button,
+  .quick-actions button,
+  .action-grid,
   .record-actions .action-box,
   .record-actions .action-box button {
     width: 100%;

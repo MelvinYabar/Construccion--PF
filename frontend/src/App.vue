@@ -81,6 +81,20 @@ const viewIcons = {
   result: '📌',
 }
 
+const actionIcons = {
+  'members-list': '👥',
+  'members-add': '➕',
+  'members-remove': '➖',
+  'mentors-list': '🎓',
+  'mentors-add': '🤝',
+  'mentors-remove': '↩️',
+  'deliverables-list': '📎',
+  'deliverables-add': '⬆️',
+  'reviews-list': '✅',
+  'reviews-add': '✍️',
+  status: '🔁',
+}
+
 function canAccessResource(resource, action) {
   if (!user.value) return false
   if (isAdmin.value) return true
@@ -142,6 +156,10 @@ function roleLabel(role) {
 
 function iconFor(key) {
   return viewIcons[key] || '•'
+}
+
+function actionIcon(action) {
+  return actionIcons[action.key] || '•'
 }
 
 function badgeClass(value) {
@@ -734,22 +752,37 @@ onMounted(async () => {
             </dl>
 
             <div class="record-actions">
-                  <button @click="stateFor(activeResource).selectedId = item[activeResource.idField]; getResource(activeResource)">Ver</button>
-                  <button v-if="activeResource.canDelete && canAccessResource(activeResource, 'delete')" class="danger" @click="deleteResource(activeResource, item[activeResource.idField])">Eliminar</button>
-                  <div v-for="action in (activeResource.customActions || []).filter(canRunAction)" :key="action.key" class="action-box">
-                    <template v-if="action.fields">
-                      <label v-for="field in action.fields" :key="field.name">
-                        {{ field.label }}
-                        <textarea v-if="field.type === 'textarea'" v-model="actionForm(activeResource, action, item)[field.name]"></textarea>
-                        <select v-else-if="field.type === 'select'" v-model="actionForm(activeResource, action, item)[field.name]">
-                          <option value="">Seleccionar</option>
-                          <option v-for="option in field.options" :key="option" :value="option">{{ option }}</option>
-                        </select>
-                        <input v-else v-model="actionForm(activeResource, action, item)[field.name]" :type="field.type || 'text'" />
-                      </label>
-                    </template>
-                    <button @click="runAction(activeResource, action, item)">{{ action.label }}</button>
+              <div class="quick-actions">
+                <button class="secondary" @click="stateFor(activeResource).selectedId = item[activeResource.idField]; getResource(activeResource)">
+                  <span class="button-icon">👁️</span>
+                  Ver detalle
+                </button>
+                <button v-if="activeResource.canDelete && canAccessResource(activeResource, 'delete')" class="danger" @click="deleteResource(activeResource, item[activeResource.idField])">
+                  <span class="button-icon">🗑️</span>
+                  Eliminar
+                </button>
+              </div>
+
+              <div v-if="(activeResource.customActions || []).filter(canRunAction).length" class="action-grid">
+                <div v-for="action in (activeResource.customActions || []).filter(canRunAction)" :key="action.key" class="action-box">
+                  <div class="action-title">
+                    <span>{{ actionIcon(action) }}</span>
+                    <strong>{{ action.label }}</strong>
                   </div>
+                  <template v-if="action.fields">
+                    <label v-for="field in action.fields" :key="field.name">
+                      {{ field.label }}
+                      <textarea v-if="field.type === 'textarea'" v-model="actionForm(activeResource, action, item)[field.name]"></textarea>
+                      <select v-else-if="field.type === 'select'" v-model="actionForm(activeResource, action, item)[field.name]">
+                        <option value="">Seleccionar</option>
+                        <option v-for="option in field.options" :key="option" :value="option">{{ option }}</option>
+                      </select>
+                      <input v-else v-model="actionForm(activeResource, action, item)[field.name]" :type="field.type || 'text'" />
+                    </label>
+                  </template>
+                  <button @click="runAction(activeResource, action, item)">Ejecutar</button>
+                </div>
+              </div>
             </div>
           </article>
         </div>
