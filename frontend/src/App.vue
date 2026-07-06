@@ -43,6 +43,24 @@ const isAuthenticated = computed(() => Boolean(token.value && user.value))
 const isAdmin = computed(() => user.value?.role === 'admin')
 const isMentor = computed(() => user.value?.role === 'mentor')
 const visibleResources = computed(() => resources.filter((resource) => canAccessResource(resource, 'view')))
+const sessionName = computed(() => user.value?.full_name || user.value?.email || 'Usuario')
+
+const resourceDescriptions = {
+  profiles: 'Gestiona usuarios, roles y datos principales del equipo de Parmenia.',
+  phases: 'Ordena el recorrido de incubacion por etapas de avance.',
+  cohorts: 'Administra convocatorias, fechas y oportunidades activas.',
+  enrollments: 'Revisa y controla las postulaciones a cada convocatoria.',
+  projects: 'Da seguimiento a proyectos, miembros, mentores y entregables.',
+  posts: 'Publica anuncios, novedades y contenidos para la comunidad.',
+  deliverables: 'Consulta y actualiza archivos enviados por los equipos.',
+  reviews: 'Revisa feedback y resultados de evaluaciones de entregables.',
+}
+
+const roleLabels = {
+  admin: 'Administrador',
+  mentor: 'Mentor',
+  emprendedor: 'Emprendedor',
+}
 
 function canAccessResource(resource, action) {
   if (!user.value) return false
@@ -97,6 +115,21 @@ function canRunAction(action) {
 function setMessage(message, type = 'notice') {
   notice.value = type === 'notice' ? message : ''
   error.value = type === 'error' ? message : ''
+}
+
+function roleLabel(role) {
+  return roleLabels[role] || role || '-'
+}
+
+function badgeClass(value) {
+  const normalized = String(value || '').toLowerCase()
+  return {
+    badge: true,
+    success: ['aceptada', 'aprobado', 'publicado', 'true', 'admin'].includes(normalized),
+    warning: ['pendiente', 'mentor'].includes(normalized),
+    danger: ['rechazada', 'rechazado', 'false'].includes(normalized),
+    neutral: !['aceptada', 'aprobado', 'publicado', 'true', 'admin', 'pendiente', 'mentor', 'rechazada', 'rechazado', 'false'].includes(normalized),
+  }
 }
 
 function normalizeList(value) {
@@ -313,6 +346,7 @@ async function scheduleMentorshipWithGoogle() {
 function formatValue(value) {
   if (value === null || value === undefined) return '-'
   if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'boolean') return value ? 'Si' : 'No'
   if (typeof value === 'object') {
     return Object.entries(value)
       .map(([key, nestedValue]) => `${formatLabel(key)}: ${formatValue(nestedValue)}`)
@@ -390,7 +424,7 @@ function summaryTitle(item) {
 }
 
 function summarySubtitle(resource, item) {
-  const role = item?.role ? `Rol: ${item.role}` : ''
+  const role = item?.role ? `Rol: ${roleLabel(item.role)}` : ''
   const status = item?.status ? `Estado: ${item.status}` : ''
   const id = item?.[resource?.idField] ? `ID: ${item[resource.idField]}` : ''
   return [role, status, id].filter(Boolean).join(' · ')
@@ -423,7 +457,7 @@ onMounted(async () => {
         <span class="mark">P</span>
         <div>
           <strong>Parmenia</strong>
-          <small>Pre-incubacion</small>
+          <small>Gestion de incubacion</small>
         </div>
       </div>
 
@@ -433,16 +467,25 @@ onMounted(async () => {
           {{ resource.title }}
         </button>
       </nav>
+
+      <div v-if="isAuthenticated" class="sidebar-card">
+        <span>Sesion activa</span>
+        <strong>{{ roleLabel(user.role) }}</strong>
+        <small>{{ user.email }}</small>
+      </div>
     </aside>
 
     <main>
       <header class="topbar">
         <div>
           <h1>{{ activeResource?.title || 'Dashboard' }}</h1>
-          <p v-if="user">Sesion: {{ user.full_name || user.email }} · {{ user.role }}</p>
-          <p v-else>Frontend Vue consumiendo la API FastAPI y OAuth2 con Google.</p>
+          <p v-if="user">{{ resourceDescriptions[activeKey] || `Bienvenido, ${sessionName}. Revisa el avance de Parmenia desde un solo panel.` }}</p>
+          <p v-else>Plataforma para acompanar proyectos desde la postulacion hasta la incubacion.</p>
         </div>
-        <button v-if="isAuthenticated" class="ghost" @click="logout">Cerrar sesion</button>
+        <div v-if="isAuthenticated" class="topbar-actions">
+          <span :class="badgeClass(user.role)">{{ roleLabel(user.role) }}</span>
+          <button class="ghost" @click="logout">Cerrar sesion</button>
+        </div>
       </header>
 
       <p v-if="notice" class="notice">{{ notice }}</p>
@@ -450,16 +493,27 @@ onMounted(async () => {
       <p v-if="loading" class="loading">Procesando...</p>
 
       <section v-if="!isAuthenticated" class="auth-grid">
-        <form class="panel" @submit.prevent="login">
-          <h2>Login tradicional</h2>
+        <div class="welcome-panel">
+          <span class="eyebrow">Parmenia Platform</span>
+          <h2>Impulsa proyectos desde la convocatoria hasta la incubacion.</h2>
+          <p>Un portal para gestionar equipos, mentores, entregables, publicaciones y reportes con permisos por rol.</p>
+          <div class="trust-row">
+            <span>OAuth2 Google</span>
+            <span>JWT</span>
+            <span>Supabase</span>
+          </div>
+        </div>
+
+        <form class="panel auth-panel" @submit.prevent="login">
+          <h2>Iniciar sesion</h2>
           <label>Email<input v-model="loginForm.email" type="email" required /></label>
           <label>Password<input v-model="loginForm.password" type="password" required /></label>
           <button type="submit">Ingresar</button>
           <small>Prueba: admin@parmenia.pe / admin123</small>
         </form>
 
-        <form class="panel" @submit.prevent="register">
-          <h2>Registro</h2>
+        <form class="panel auth-panel" @submit.prevent="register">
+          <h2>Crear cuenta</h2>
           <label>Email<input v-model="registerForm.email" type="email" required /></label>
           <label>Password<input v-model="registerForm.password" type="password" required /></label>
           <label>Nombre<input v-model="registerForm.full_name" /></label>
@@ -473,9 +527,9 @@ onMounted(async () => {
           <button type="submit">Crear cuenta</button>
         </form>
 
-        <div class="panel">
+        <div class="panel auth-panel">
           <h2>OAuth2 con Google</h2>
-          <p>Usa Google Identity para validar el usuario y obtener un JWT local de la API.</p>
+          <p>Valida tu identidad con Google y obtiene un JWT local para consumir la API.</p>
           <div id="googleButton" class="google-slot"></div>
           <p v-if="!googleClientId" class="error">Configura VITE_GOOGLE_CLIENT_ID en frontend/.env</p>
         </div>
@@ -488,7 +542,10 @@ onMounted(async () => {
           <dl class="detail-list">
             <template v-for="entry in importantFields({ key: 'profiles' }, user)" :key="entry.label">
               <dt>{{ entry.label }}</dt>
-              <dd>{{ entry.value }}</dd>
+              <dd>
+                <span v-if="entry.label === 'Rol'" :class="badgeClass(user.role)">{{ roleLabel(user.role) }}</span>
+                <span v-else>{{ entry.value }}</span>
+              </dd>
             </template>
           </dl>
         </article>
@@ -578,10 +635,16 @@ onMounted(async () => {
 
       <section v-else-if="activeResource" class="resource">
         <div class="toolbar">
-          <button v-if="activeResource.canList !== false && canAccessResource(activeResource, 'list')" @click="listResource(activeResource)">Listar {{ activeResource.title }}</button>
-          <input v-model="stateFor(activeResource).selectedId" placeholder="ID para obtener/eliminar" />
-          <button v-if="canAccessResource(activeResource, 'get')" @click="getResource(activeResource)">Obtener por ID</button>
-          <button v-if="activeResource.canDelete && canAccessResource(activeResource, 'delete')" class="danger" @click="deleteResource(activeResource)">Eliminar por ID</button>
+          <div class="toolbar-copy">
+            <strong>{{ activeResource.title }}</strong>
+            <p>{{ resourceDescriptions[activeResource.key] }}</p>
+          </div>
+          <div class="toolbar-actions">
+            <button v-if="activeResource.canList !== false && canAccessResource(activeResource, 'list')" @click="listResource(activeResource)">Listar</button>
+            <input v-model="stateFor(activeResource).selectedId" placeholder="ID para consultar" />
+            <button v-if="canAccessResource(activeResource, 'get')" class="secondary" @click="getResource(activeResource)">Obtener</button>
+            <button v-if="activeResource.canDelete && canAccessResource(activeResource, 'delete')" class="danger" @click="deleteResource(activeResource)">Eliminar</button>
+          </div>
         </div>
 
         <div class="grid">
@@ -621,7 +684,7 @@ onMounted(async () => {
           </form>
         </div>
 
-        <div class="cards">
+        <div v-if="stateFor(activeResource).items.length" class="cards">
           <article v-for="item in stateFor(activeResource).items" :key="item[activeResource.idField]" class="record-card">
             <div class="record-head">
               <div>
@@ -633,7 +696,10 @@ onMounted(async () => {
             <dl class="detail-list">
               <template v-for="entry in importantFields(activeResource, item)" :key="entry.label">
                 <dt>{{ entry.label }}</dt>
-                <dd>{{ entry.value }}</dd>
+                <dd>
+                  <span v-if="['Rol', 'Estado', 'Publicado'].includes(entry.label)" :class="badgeClass(entry.value)">{{ entry.label === 'Rol' ? roleLabel(item.role) : entry.value }}</span>
+                  <span v-else>{{ entry.value }}</span>
+                </dd>
               </template>
             </dl>
 
@@ -657,13 +723,20 @@ onMounted(async () => {
             </div>
           </article>
         </div>
+        <div v-else class="empty-state">
+          <strong>No hay registros cargados</strong>
+          <p>Usa Listar para consultar la API o crea un nuevo registro si tu rol lo permite.</p>
+        </div>
 
         <article class="panel">
           <h2>Resultado</h2>
           <dl v-if="stateFor(activeResource).actionResult && !Array.isArray(stateFor(activeResource).actionResult)" class="detail-list">
             <template v-for="entry in importantFields(activeResource, stateFor(activeResource).actionResult)" :key="entry.label">
               <dt>{{ entry.label }}</dt>
-              <dd>{{ entry.value }}</dd>
+              <dd>
+                <span v-if="['Rol', 'Estado', 'Publicado'].includes(entry.label)" :class="badgeClass(entry.value)">{{ entry.value }}</span>
+                <span v-else>{{ entry.value }}</span>
+              </dd>
             </template>
           </dl>
           <div v-else-if="Array.isArray(stateFor(activeResource).actionResult)" class="cards">
@@ -672,7 +745,10 @@ onMounted(async () => {
               <dl class="detail-list">
                 <template v-for="entry in importantFields(activeResource, item)" :key="entry.label">
                   <dt>{{ entry.label }}</dt>
-                  <dd>{{ entry.value }}</dd>
+                  <dd>
+                    <span v-if="['Rol', 'Estado', 'Publicado'].includes(entry.label)" :class="badgeClass(entry.value)">{{ entry.value }}</span>
+                    <span v-else>{{ entry.value }}</span>
+                  </dd>
                 </template>
               </dl>
             </article>
