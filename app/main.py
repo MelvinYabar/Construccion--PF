@@ -1,6 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
+from app.database import SessionLocal
 from app.routers import auth, cohorts, deliverables, enrollments, integrations, phases, posts, profiles, projects, reports
 
 
@@ -18,6 +20,23 @@ app.add_middleware(
 @app.get("/health", tags=["Health"])
 def health():
     return {"status": "ok"}
+
+
+@app.get("/health/db", tags=["Health"])
+def health_db():
+    try:
+        with SessionLocal() as db:
+            db.execute(text("select 1"))
+        return {"status": "ok", "database": "connected"}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "database": "unavailable",
+                "error_type": exc.__class__.__name__,
+                "message": str(exc).split("\n")[0],
+            },
+        ) from exc
 
 
 app.include_router(auth.router)
