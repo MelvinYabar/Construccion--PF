@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.auth import can_access_project, get_current_user, is_admin, is_project_member, is_project_mentor, require_roles
 from app.database import get_db
+from app.mongo import log_action
 
 
 router = APIRouter(tags=["Deliverables & Reviews"])
@@ -72,6 +73,21 @@ def create_deliverable(
     for m in mentors:
         create_notification(db, m.mentor_id, "Nuevo entregable", f"Se subió un entregable para la fase '{phase_label}'.", "deliverable", deliverable.id)
     db.commit()
+
+    # Audit log — entregable subido
+    log_action(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="deliverable.upload",
+        resource="deliverable",
+        resource_id=str(deliverable.id),
+        details={
+            "project_id": str(project_id),
+            "phase_id": deliverable.phase_id,
+            "phase_name": phase_label,
+            "file_url": deliverable.file_url,
+        },
+    )
 
     return deliverable
 
@@ -297,6 +313,22 @@ def create_deliverable_review(
         for m in members:
             create_notification(db, m.user_id, "Entregable revisado", f"Tu entregable fue {status_label}.", "review", deliverable.id)
         db.commit()
+
+    # Audit log — revisión de entregable (mentor aprueba/rechaza)
+    log_action(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="review.create",
+        resource="deliverable",
+        resource_id=str(deliverable.id),
+        details={
+            "review_id": str(review.id),
+            "status": review.status.value if hasattr(review.status, 'value') else str(review.status),
+            "deliverable_id": str(deliverable.id),
+            "project_id": str(project.id) if project else None,
+            "feedback_length": len(review.feedback) if review.feedback else 0,
+        },
+    )
 
     return review
 

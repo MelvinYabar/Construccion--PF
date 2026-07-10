@@ -7,7 +7,7 @@ from app.database import SessionLocal
 from app.routers import (
     auth, cohorts, deliverables, enrollments, integrations,
     phases, posts, profiles, projects, reports,
-    notifications, comments, upload,
+    notifications, comments, upload, audit,
 )
 
 app = FastAPI(title="Parmenia API", version="1.0.0")
@@ -52,3 +52,4 @@ app.include_router(integrations.router)
 app.include_router(notifications.router)
 app.include_router(comments.router)
 app.include_router(upload.router)
+app.include_router(audit.router)

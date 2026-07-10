@@ -1,0 +1,77 @@
+flowchart TB
+    subgraph Usuario["Usuario"]
+        U["👤 Usuario final<br/>(emprendedor / mentor / admin)"]
+    end
+
+    subgraph Frontend["Frontend — Vue 3 + Vite (Vercel)"]
+        F["SPA Vue 3<br/>Login UI · Sidebar · Vistas<br/>TailwindCSS"]
+    end
+
+    subgraph Backend["Backend — FastAPI (Render)"]
+        AUTH["Auth Router<br/>· /auth/login (local)<br/>· /auth/oauth/google/login<br/>· /auth/oauth/google/callback<br/>· /auth/oauth/google/verify"]
+        API["API Routers<br/>· projects · deliverables<br/>· cohorts · enrollments<br/>· posts · notifications<br/>· comments · integrations<br/>· audit · reports · upload"]
+        JWT["JWT local (HS256)<br/>get_current_user"]
+        MONGO_LAYER["MongoDB Layer<br/>log_action()"]
+    end
+
+    subgraph Proveedor["Proveedor OAuth 2.0 (tercero)"]
+        G["Google Identity<br/>· Authorize URL<br/>· Token URL<br/>· JWKS (claves públicas)"]
+    end
+
+    subgraph BD1["Base de datos relacional"]
+        PG[("PostgreSQL — Supabase<br/>profiles · projects · phases<br/>cohorts · enrollments · deliverables<br/>reviews · mentorships · notifications")]
+    end
+
+    subgraph BD2["Base de datos NoSQL"]
+        MG[("MongoDB — Atlas<br/>audit_logs")]
+    end
+
+    subgraph Ext["Integración externa"]
+        GCAL["Google Calendar API<br/>(mentorías)"]
+        SBST["Supabase Storage<br/>(archivos de entregables)"]
+    end
+
+    %% Flujo OAuth Authorization Code
+    U -. "1. click 'Continuar con Google'" .-> F
+    F ==>|"2. GET /auth/oauth/google/login"| AUTH
+    AUTH -.->|"3. 302 redirect"| G
+    U -.->|"4. login + consent"| G
+    G -.->|"5. 302 callback?code=...&state=..."| AUTH
+    AUTH -.->|"6. POST /token (code + client_secret)"| G
+    G -.->|"7. {access_token, id_token}"| AUTH
+    AUTH -.->|"8. verify id_token (JWKS)"| G
+    AUTH ==>|"9. upsert Profile<br/>google_sub + role"| PG
+    AUTH -.->|"10. log_action()"| MONGO_LAYER
+    MONGO_LAYER ==> MG
+    AUTH ==>|"11. 302 redirect frontend<br/>?token=jwt_local"| F
+    F ==>|"12. /auth/me"| AUTH
+
+    %% Requests autenticados normales
+    U -. "request normal autenticado" .-> F
+    F ==>|"Authorization: Bearer jwt_local"| API
+    API ==> JWT
+    JWT -.->|"valida firma + sub"| PG
+    API ==> PG
+    API -.-> MONGO_LAYER
+    MONGO_LAYER -.-> MG
+
+    %% Integraciones
+    API -.->|"crear evento"| GCAL
+    API -.->|"subir archivo"| SBST
+
+    %% Estilos — paleta turquesa/cream de Parmenia
+    classDef frontend fill:#1ABC9C,color:#fff,stroke:#16A085,stroke-width:2px
+    classDef backend fill:#ECF0F1,color:#2C3E50,stroke:#1ABC9C,stroke-width:2px
+    classDef oauth fill:#FEF3C7,color:#92400E,stroke:#F59E0B,stroke-width:2px
+    classDef postgres fill:#E0F2FE,color:#075985,stroke:#0EA5E9,stroke-width:2px
+    classDef mongo fill:#F0FDF4,color:#166534,stroke:#22C55E,stroke-width:2px
+    classDef external fill:#FCE7F3,color:#9D174D,stroke:#EC4899,stroke-width:2px
+    classDef user fill:#F3E8FF,color:#6B21A8,stroke:#A855F7,stroke-width:2px
+
+    class U user
+    class F frontend
+    class AUTH,API,JWT,MONGO_LAYER backend
+    class G oauth
+    class PG postgres
+    class MG mongo
+    class GCAL,SBST external

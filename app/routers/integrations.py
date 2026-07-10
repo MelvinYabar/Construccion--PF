@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.auth import get_current_user, require_roles, is_project_mentor, is_admin
 from app.database import get_db
+from app.mongo import log_action
 
 import requests
 
@@ -91,6 +92,22 @@ def create_google_calendar_mentorship(
         for m in members:
             create_notification(db, m.user_id, "Nueva mentoría agendada", f"'{payload.title}' — {payload.start_datetime.strftime('%d/%m %H:%M')}", "info", mentorship.id)
         db.commit()
+
+    # Audit log — mentoría agendada en Google Calendar
+    log_action(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="mentorship.schedule",
+        resource="mentorship",
+        resource_id=str(mentorship.id),
+        details={
+            "title": mentorship.title,
+            "project_id": str(mentorship.project_id) if mentorship.project_id else None,
+            "google_event_id": mentorship.google_event_id,
+            "google_meet_link": mentorship.google_meet_link,
+            "start_datetime": mentorship.start_datetime.isoformat() if mentorship.start_datetime else None,
+        },
+    )
 
     return mentorship
 

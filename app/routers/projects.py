@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.auth import can_access_project, get_current_user, is_admin, is_project_member, is_project_mentor, require_roles
 from app.database import get_db
+from app.mongo import log_action
 
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
@@ -115,6 +116,17 @@ def create_project(
         raise
 
     db.refresh(project)
+
+    # Audit log — proyecto creado
+    log_action(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="project.create",
+        resource="project",
+        resource_id=str(project.id),
+        details={"name": project.name, "cohort_id": str(project.cohort_id) if project.cohort_id else None},
+    )
+
     return project
 
 
@@ -480,6 +492,16 @@ def change_project_phase(
     for m in members:
         create_notification(db, m.user_id, "Fase actualizada", f"Tu proyecto '{project.name}' avanzó a la fase: {phase.name}", "info", project_id)
     db.commit()
+
+    # Audit log — cambio manual de fase por admin
+    log_action(
+        user_id=current_user.id,
+        user_email=current_user.email,
+        action="project.change_phase",
+        resource="project",
+        resource_id=str(project.id),
+        details={"new_phase": phase.name, "project_name": project.name},
+    )
 
     return project
 

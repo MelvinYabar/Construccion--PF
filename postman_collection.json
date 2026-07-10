@@ -1,0 +1,784 @@
+{
+  "info": {
+    "name": "Parmenia API",
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "description": "Colección completa de la API de Parmenia — Plataforma de Pre-incubación de la Universidad La Salle.\n\n## Autenticación\n\nLa API usa 2 mecanismos de autenticación:\n\n### 1. Login local (email + password)\n\nPOST /auth/login con email/password → devuelve `access_token` (JWT local).\n\n### 2. OAuth 2.0 Authorization Code con Google\n\nEl flujo se inicia desde el frontend (no desde Postman):\n1. Browser → GET /auth/oauth/google/login → redirige a Google\n2. Usuario se loguea en Google + consentimiento\n3. Google redirige a /auth/oauth/google/callback?code=...&state=...\n4. Backend intercambia code por tokens (server-to-server con CLIENT_SECRET)\n5. Backend valida ID token con JWKS de Google\n6. Backend emite JWT local y redirige al frontend con ?token=<jwt>\n\nPara probar endpoints protegidos desde Postman, usa el JWT obtenido del login local en el header `Authorization: Bearer {{token}}`.\n\n## Variables de entorno\n\nConfigura estas variables en tu entorno de Postman:\n- `base_url`: http://localhost:8000 (local) o https://parmenia-api-r0oi.onrender.com (producción)\n- `token`: JWT obtenido tras login\n- `admin_token`: JWT de admin (para endpoints de admin)\n- `mentor_token`: JWT de mentor\n- `user_id`, `project_id`, `deliverable_id`, `cohort_id`: se autocompletan con tests\n\n## Usuarios de prueba\n\n| Email | Password | Rol |\n|---|---|---|\n| admin@parmenia.pe | admin123 | admin |\n| carlos.mentor@parmenia.pe | mentor123 | mentor |\n| luis.emp@parmenia.pe | emp123 | emprendedor |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "admin_token", "value": "", "type": "string" },
+    { "key": "mentor_token", "value": "", "type": "string" },
+    { "key": "user_id", "value": "", "type": "string" },
+    { "key": "project_id", "value": "", "type": "string" },
+    { "key": "deliverable_id", "value": "", "type": "string" },
+    { "key": "cohort_id", "value": "", "type": "string" },
+    { "key": "phase_id", "value": "1", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Health DB check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health/db",
+              "host": ["{{base_url}}"],
+              "path": ["health", "db"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth — Login local",
+      "item": [
+        {
+          "name": "Register (emprendedor)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nuevo.emp@parmenia.pe\",\n  \"password\": \"emp999\",\n  \"full_name\": \"Nuevo Emprendedor\",\n  \"faculty\": \"Ingeniería\",\n  \"skills\": [\"Python\", \"Diseño\"],\n  \"role\": \"emprendedor\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.environment.set('token', json.access_token);",
+                  "  pm.environment.set('user_id', json.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Login as admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@parmenia.pe\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.environment.set('admin_token', json.access_token);",
+                  "  pm.environment.set('token', json.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Login as mentor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"carlos.mentor@parmenia.pe\",\n  \"password\": \"mentor123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) { pm.environment.set('mentor_token', json.access_token); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Login as emprendedor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"luis.emp@parmenia.pe\",\n  \"password\": \"emp123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.environment.set('token', json.access_token);",
+                  "  pm.environment.set('user_id', json.user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get current user (/auth/me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth — OAuth Authorization Code (Google)",
+      "item": [
+        {
+          "name": "1. Login URL (abrir en browser)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/auth/oauth/google/login", "host": ["{{base_url}}"], "path": ["auth", "oauth", "google", "login"] }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Callback (lo llama Google, no usar directo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/oauth/google/callback?code=PASTE_CODE_HERE&state=PASTE_STATE_HERE",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "oauth", "google", "callback"],
+              "query": [
+                { "key": "code", "value": "PASTE_CODE_HERE" },
+                { "key": "state", "value": "PASTE_STATE_HERE" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify ID token (demo validación JWKS)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"<google_id_token_jwt>\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/oauth/google/verify", "host": ["{{base_url}}"], "path": ["auth", "oauth", "google", "verify"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profiles",
+      "item": [
+        {
+          "name": "List profiles (admin only)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "{{base_url}}/profiles/", "host": ["{{base_url}}"], "path": ["profiles"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Get profile by id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/profiles/{{user_id}}", "host": ["{{base_url}}"], "path": ["profiles", "{{user_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Nombre Actualizado\",\n  \"faculty\": \"Ingeniería de Software\",\n  \"skills\": [\"Python\", \"FastAPI\", \"PostgreSQL\"]\n}"
+            },
+            "url": { "raw": "{{base_url}}/profiles/{{user_id}}", "host": ["{{base_url}}"], "path": ["profiles", "{{user_id}}"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Phases",
+      "item": [
+        {
+          "name": "List phases",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/phases/", "host": ["{{base_url}}"], "path": ["phases"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create phase (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ideación\",\n  \"description\": \"Fase inicial\",\n  \"order\": 1\n}"
+            },
+            "url": { "raw": "{{base_url}}/phases/", "host": ["{{base_url}}"], "path": ["phases"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cohorts",
+      "item": [
+        {
+          "name": "List cohorts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/cohorts/", "host": ["{{base_url}}"], "path": ["cohorts"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create cohort (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Convocatoria 2026-I\",\n  \"description\": \"Convocatoria primer semestre 2026\",\n  \"start_date\": \"2026-03-01\",\n  \"end_date\": \"2026-07-31\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/cohorts/", "host": ["{{base_url}}"], "path": ["cohorts"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["var json = pm.response.json(); if (json.id) { pm.environment.set('cohort_id', json.id); }"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Enrollments",
+      "item": [
+        {
+          "name": "List enrollments",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/enrollments/", "host": ["{{base_url}}"], "path": ["enrollments"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create enrollment (inscribirse)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cohort_id\": \"{{cohort_id}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/enrollments/", "host": ["{{base_url}}"], "path": ["enrollments"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update enrollment status (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"aceptada\"\n}" },
+            "url": { "raw": "{{base_url}}/enrollments/{{enrollment_id}}/status", "host": ["{{base_url}}"], "path": ["enrollments", "{{enrollment_id}}", "status"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "List projects",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/projects/?skip=0&limit=50", "host": ["{{base_url}}"], "path": ["projects"], "query": [{ "key": "skip", "value": "0" }, { "key": "limit", "value": "50" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "My stats (emprendedor)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/projects/my-stats", "host": ["{{base_url}}"], "path": ["projects", "my-stats"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create project",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"EcoTrack\",\n  \"description\": \"App para tracking de residuos reciclables\",\n  \"cohort_id\": \"{{cohort_id}}\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/projects/", "host": ["{{base_url}}"], "path": ["projects"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["var json = pm.response.json(); if (json.id) { pm.environment.set('project_id', json.id); }"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get project by id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Public detail (sin auth)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/public-detail", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "public-detail"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Update project",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"EcoTrack v2\",\n  \"description\": \"Descripción actualizada\"\n}" },
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Change project phase (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/phase?phase_id={{phase_id}}", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "phase"], "query": [{ "key": "phase_id", "value": "{{phase_id}}" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "List project members",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/members", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "members"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Add project member",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"user_id\": \"{{user_id}}\"\n}" },
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/members", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "members"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List project mentors",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/mentors", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "mentors"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign mentor to project",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"mentor_id\": \"{{mentor_id}}\"\n}" },
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/mentors", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "mentors"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Posts (Noticias)",
+      "item": [
+        {
+          "name": "List posts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/posts/?skip=0&limit=50", "host": ["{{base_url}}"], "path": ["posts"], "query": [{ "key": "skip", "value": "0" }, { "key": "limit", "value": "50" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create post (admin/mentor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Nueva convocatoria abierta\",\n  \"content\": \"Se abren las inscripciones para el ciclo 2026-I\",\n  \"image_url\": \"\",\n  \"is_published\": true\n}"
+            },
+            "url": { "raw": "{{base_url}}/posts/", "host": ["{{base_url}}"], "path": ["posts"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Deliverables & Reviews",
+      "item": [
+        {
+          "name": "List deliverables by project",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/deliverables", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "deliverables"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload deliverable",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phase_id\": {{phase_id}},\n  \"file_url\": \"https://supabase.co/storage/v1/object/public/deliverables/archivo.pdf\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/projects/{{project_id}}/deliverables", "host": ["{{base_url}}"], "path": ["projects", "{{project_id}}", "deliverables"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": ["var json = pm.response.json(); if (json.id) { pm.environment.set('deliverable_id', json.id); }"],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get deliverable by id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/deliverables/{{deliverable_id}}", "host": ["{{base_url}}"], "path": ["deliverables", "{{deliverable_id}}"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Create review (mentor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{mentor_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"aprobado\",\n  \"feedback\": \"Excelente trabajo, cumple con todos los criterios.\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/deliverables/{{deliverable_id}}/reviews", "host": ["{{base_url}}"], "path": ["deliverables", "{{deliverable_id}}", "reviews"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List reviews for deliverable",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/deliverables/{{deliverable_id}}/reviews", "host": ["{{base_url}}"], "path": ["deliverables", "{{deliverable_id}}", "reviews"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Comments",
+      "item": [
+        {
+          "name": "List comments for deliverable",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/deliverables/{{deliverable_id}}/comments", "host": ["{{base_url}}"], "path": ["deliverables", "{{deliverable_id}}", "comments"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Add comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"¿Pueden aclarar el alcance del módulo de reportes?\"\n}" },
+            "url": { "raw": "{{base_url}}/deliverables/{{deliverable_id}}/comments", "host": ["{{base_url}}"], "path": ["deliverables", "{{deliverable_id}}", "comments"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/notifications/?unread_only=false", "host": ["{{base_url}}"], "path": ["notifications"], "query": [{ "key": "unread_only", "value": "false" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Unread count",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/notifications/unread-count", "host": ["{{base_url}}"], "path": ["notifications", "unread-count"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark all as read",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/notifications/read-all", "host": ["{{base_url}}"], "path": ["notifications", "read-all"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mentorships (Google Calendar)",
+      "item": [
+        {
+          "name": "List my mentorships",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/integrations/mentorships", "host": ["{{base_url}}"], "path": ["integrations", "mentorships"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Schedule mentorship (requires Google access token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"google_access_token\": \"ya29.a0AfH6S... (obtenido por el frontend via GIS)\",\n  \"project_id\": \"{{project_id}}\",\n  \"title\": \"Mentoría de revisión de avance\",\n  \"description\": \"Revisión del progreso en la fase actual\",\n  \"start_datetime\": \"2026-07-15T15:00:00-05:00\",\n  \"end_datetime\": \"2026-07-15T16:00:00-05:00\",\n  \"attendee_emails\": [\"luis.emp@parmenia.pe\"],\n  \"create_meet\": true\n}"
+            },
+            "url": { "raw": "{{base_url}}/integrations/google-calendar/mentorships", "host": ["{{base_url}}"], "path": ["integrations", "google-calendar", "mentorships"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Audit Logs (MongoDB)",
+      "item": [
+        {
+          "name": "MongoDB status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/audit/status", "host": ["{{base_url}}"], "path": ["audit", "status"] }
+          },
+          "response": []
+        },
+        {
+          "name": "List audit logs (admin: all / user: own)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/audit/logs?limit=100", "host": ["{{base_url}}"], "path": ["audit", "logs"], "query": [{ "key": "limit", "value": "100" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "My audit logs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/audit/me?limit=50", "host": ["{{base_url}}"], "path": ["audit", "me"], "query": [{ "key": "limit", "value": "50" }] }
+          },
+          "response": []
+        },
+        {
+          "name": "Insert test log",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/audit/test", "host": ["{{base_url}}"], "path": ["audit", "test"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reports (admin)",
+      "item": [
+        {
+          "name": "Dashboard stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "{{base_url}}/reports/dashboard", "host": ["{{base_url}}"], "path": ["reports", "dashboard"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Cohort progress",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+            "url": { "raw": "{{base_url}}/reports/cohort/{{cohort_id}}/progress", "host": ["{{base_url}}"], "path": ["reports", "cohort", "{{cohort_id}}", "progress"] }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Upload file",
+      "item": [
+        {
+          "name": "Upload file to Supabase Storage",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "url": { "raw": "{{base_url}}/upload/file", "host": ["{{base_url}}"], "path": ["upload", "file"] }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

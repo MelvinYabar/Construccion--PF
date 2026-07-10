@@ -15,6 +15,7 @@ from app import models, schemas
 from app.auth import create_access_token, get_current_user, JWT_SECRET, JWT_ALGORITHM
 from app.database import get_db
 from app.supabase_auth import create_supabase_auth_user
+from app.mongo import log_action
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -111,6 +112,15 @@ def register(user_in: schemas.RegisterRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(profile.id, profile.role.value)
 
+    # Audit log — nuevo usuario registrado
+    log_action(
+        user_id=profile.id,
+        user_email=profile.email,
+        action="auth.register",
+        resource="session",
+        details={"role": profile.role.value, "method": "local"},
+    )
+
     return schemas.AuthResponse(
         access_token=token,
         token_type="bearer",
@@ -133,6 +143,15 @@ def login(credentials: schemas.LoginRequest, db: Session = Depends(get_db)):
         )
 
     token = create_access_token(profile.id, profile.role.value)
+
+    # Audit log — login local exitoso
+    log_action(
+        user_id=profile.id,
+        user_email=profile.email,
+        action="auth.login.local",
+        resource="session",
+        details={"role": profile.role.value},
+    )
 
     return schemas.AuthResponse(
         access_token=token,
@@ -399,6 +418,20 @@ def google_oauth_authorize_code_callback(
 
     # 6. Emitir JWT local (la app sigue usando este JWT para los endpoints protegidos)
     local_jwt = create_access_token(profile.id, profile.role.value)
+
+    # Audit log — login OAuth Authorization Code exitoso
+    log_action(
+        user_id=profile.id,
+        user_email=profile.email,
+        action="auth.login.oauth_authorization_code",
+        resource="session",
+        details={
+            "provider": "google",
+            "google_sub": google_sub,
+            "role": profile.role.value,
+            "flow": "authorization_code",
+        },
+    )
 
     # 7. Redirigir al frontend con el token (query param — el frontend lo limpia después)
     redirect_url = f"{frontend_url}/?token={local_jwt}"

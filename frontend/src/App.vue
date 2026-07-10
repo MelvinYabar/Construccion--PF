@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
-import { apiRequest, authApi, clearSession, getStoredUser, setSession, notificationsApi, commentsApi, uploadApi, mentorshipsApi, projectsApi } from './api'
+import { apiRequest, authApi, clearSession, getStoredUser, setSession, notificationsApi, commentsApi, uploadApi, mentorshipsApi, projectsApi, auditApi } from './api'
 
 /* ─── Auth state ─── */
 const user = ref(getStoredUser())
@@ -53,6 +53,7 @@ const navItems = computed(() => {
   ]
   if (isMentor.value) items.push({ key: 'mentor', label: 'Mis Mentorías', icon: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z' })
   if (isAdmin.value) items.push({ key: 'admin', label: 'Administración', icon: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z' })
+  if (isAdmin.value) items.push({ key: 'audit', label: 'Auditoría (Mongo)', icon: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z' })
   return items
 })
 
@@ -65,6 +66,7 @@ const data = reactive({
   projectDetail: null, showProjectDetail: false,
   mentorProjects: [], mentorships: [],
   mentorDeliverables: [],
+  auditLogs: [], auditStatus: null,
 })
 
 /* ─── Forms ─── */
@@ -168,6 +170,27 @@ const handleNavClick = async (key) => {
   if (key === 'entregables' && data.myProject) { await loadDeliverables(data.myProject.id) }
   if (key === 'perfil') { forms.profile = { full_name: user.value?.full_name || '', faculty: user.value?.faculty || '', skills: Array.isArray(user.value?.skills) ? user.value?.skills.join(', ') : '' }; forms.profileLoaded = true }
   if (key === 'mentor') { await loadMentorData() }
+  if (key === 'audit') { await loadAuditLogs() }
+}
+
+/* ─── Audit logs (MongoDB) ─── */
+const loadAuditLogs = async () => {
+  try {
+    data.auditStatus = await auditApi.status()
+    const res = await auditApi.logs({ limit: 100 })
+    data.auditLogs = res.logs || []
+  } catch (e) { error.value = 'No se pudieron cargar los audit logs: ' + e.message }
+}
+const insertTestLog = async () => {
+  try { await auditApi.test(); notice.value = 'Log de prueba insertado'; await loadAuditLogs() }
+  catch (e) { error.value = 'Error: ' + e.message }
+}
+const actionBadgeClass = (action) => {
+  if (action?.includes('login') || action?.includes('oauth')) return 'badge-success'
+  if (action?.includes('delete')) return 'badge-danger'
+  if (action?.includes('create') || action?.includes('upload') || action?.includes('schedule')) return 'badge-primary'
+  if (action?.includes('review') || action?.includes('change_phase')) return 'badge-warning'
+  return 'badge-neutral'
 }
 
 /* ─── Post handlers ─── */
@@ -537,6 +560,54 @@ onMounted(async () => {
           <div class="card p-4"><p class="text-sm font-bold text-parmenia-text mb-2">Inscripciones Pendientes</p><div v-if="data.enrollments.filter(e => e.status === 'pendiente').length === 0" class="text-sm text-parmenia-textDim">Sin pendientes</div><div v-else class="space-y-1.5"><div v-for="e in data.enrollments.filter(en => en.status === 'pendiente')" :key="e.id" class="flex items-center justify-between p-2.5 bg-parmenia-bg rounded-md"><div><p class="text-sm font-medium text-parmenia-text">{{ data.cohorts.find(c => c.id === e.cohort_id)?.name || 'N/A' }}</p><p class="text-xs text-parmenia-textDim">{{ fmtDate(e.enrollment_date) }}</p></div><div class="flex gap-3"><button @click="updateEnrollmentStatus(e.id, 'aceptada')" class="text-xs text-parmenia-success font-bold hover:underline">✓ Aceptar</button><button @click="updateEnrollmentStatus(e.id, 'rechazada')" class="text-xs text-parmenia-danger font-bold hover:underline">✗ Rechazar</button></div></div></div></div>
           <div class="card p-4 space-y-3"><p class="text-sm font-bold text-parmenia-text">Cambiar Fase de Proyecto</p><select v-model="forms.adminPhaseChange.project_id" class="input"><option value="">Seleccionar proyecto...</option><option v-for="p in data.projects" :key="p.id" :value="p.id">{{ p.name }}</option></select><select v-if="forms.adminPhaseChange.project_id" v-model="forms.adminPhaseChange.phase_id" class="input"><option value="">Seleccionar fase...</option><option v-for="ph in data.phases" :key="ph.id" :value="ph.id">{{ ph.name }}</option></select><button @click="adminChangePhase" :disabled="!forms.adminPhaseChange.project_id || !forms.adminPhaseChange.phase_id" class="btn-primary w-full text-xs">Cambiar fase</button></div>
           <div v-if="data.dashboardStats" class="grid grid-cols-2 sm:grid-cols-3 gap-3"><div class="card p-4"><p class="text-xl font-bold text-parmenia-primary">{{ data.dashboardStats.users_by_role?.total || 0 }}</p><p class="text-xs text-parmenia-textMuted">Usuarios</p></div><div class="card p-4"><p class="text-xl font-bold text-parmenia-primary">{{ data.dashboardStats.projects_by_phase?.total || 0 }}</p><p class="text-xs text-parmenia-textMuted">Proyectos</p></div><div class="card p-4"><p class="text-xl font-bold text-parmenia-primary">{{ data.dashboardStats.deliverables_reviewed || 0 }}</p><p class="text-xs text-parmenia-textMuted">Revisados</p></div></div>
+        </template>
+
+        <!-- ═══ AUDIT LOGS (MongoDB) ═══ -->
+        <template v-if="activeKey === 'audit' && isAdmin">
+          <div class="flex items-center justify-between"><h1 class="text-lg font-bold text-parmenia-text">Auditoría (MongoDB)</h1><button @click="insertTestLog" class="btn-secondary text-xs">+ Log de prueba</button></div>
+
+          <!-- Estado MongoDB -->
+          <div class="card p-4">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="w-2.5 h-2.5 rounded-full" :class="data.auditStatus?.available ? 'bg-parmenia-success' : 'bg-parmenia-danger'"></span>
+              <p class="text-sm font-bold text-parmenia-text">Estado de MongoDB</p>
+            </div>
+            <p v-if="!data.auditStatus?.configured" class="text-xs text-parmenia-danger">MONGODB_URI no configurado — los audit logs se están ignorando (modo degradado).</p>
+            <p v-else-if="!data.auditStatus?.available" class="text-xs text-parmenia-danger">MongoDB configurado pero no disponible: {{ data.auditStatus?.error || 'sin detalles' }}</p>
+            <div v-else class="grid grid-cols-2 gap-3 mt-2">
+              <div><p class="text-xs text-parmenia-textDim">Configurado</p><p class="text-sm font-semibold text-parmenia-success">Sí</p></div>
+              <div><p class="text-xs text-parmenia-textDim">Documentos en audit_logs</p><p class="text-sm font-semibold text-parmenia-primary">{{ data.auditStatus?.audit_logs_count ?? 0 }}</p></div>
+            </div>
+          </div>
+
+          <!-- Lista de logs -->
+          <div class="card p-4">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-sm font-bold text-parmenia-text">Logs recientes ({{ data.auditLogs.length }})</p>
+              <button @click="loadAuditLogs" class="text-xs text-parmenia-primary font-semibold hover:underline">Recargar</button>
+            </div>
+            <div v-if="data.auditLogs.length === 0" class="text-center py-6 text-parmenia-textDim text-sm">
+              Sin registros. Realiza alguna acción (login, crear proyecto, subir entregable, agendar mentoría) y recarga.
+            </div>
+            <div v-else class="space-y-2 max-h-[500px] overflow-y-auto">
+              <div v-for="log in data.auditLogs" :key="log._id" class="border border-parmenia-border rounded-md p-2.5 bg-parmenia-bg">
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                      <span :class="actionBadgeClass(log.action)" class="text-[10px] font-mono">{{ log.action }}</span>
+                      <span class="text-[10px] text-parmenia-textDim">{{ log.resource }}<span v-if="log.resource_id"> · {{ log.resource_id.substring(0, 8) }}…</span></span>
+                    </div>
+                    <p class="text-xs font-medium text-parmenia-text truncate">{{ log.user_email || log.user_id || 'anónimo' }}</p>
+                    <p class="text-[10px] text-parmenia-textDim">{{ fmtDateTime(log.created_at) }}</p>
+                    <details v-if="log.details && Object.keys(log.details).length > 0" class="mt-1">
+                      <summary class="text-[10px] text-parmenia-primary cursor-pointer hover:underline">Ver detalles</summary>
+                      <pre class="text-[10px] text-parmenia-textMuted mt-1 bg-white border border-parmenia-border rounded p-1.5 overflow-x-auto">{{ JSON.stringify(log.details, null, 2) }}</pre>
+                    </details>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </template>
 
         <!-- ═══ PERFIL ═══ -->

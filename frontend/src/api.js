@@ -86,3 +86,19 @@ export const projectsApi = {
   changePhase: (projectId, phaseId) => apiRequest(`/projects/${projectId}/phase?phase_id=${phaseId}`, { method: 'PUT' }),
   myStats: () => apiRequest('/projects/my-stats'),
 }
+
+export const auditApi = {
+  status: () => apiRequest('/audit/status'),
+  logs: (params = {}) => {
+    const query = new URLSearchParams()
+    if (params.userId) query.set('user_id', params.userId)
+    if (params.action) query.set('action', params.action)
+    if (params.resource) query.set('resource', params.resource)
+    if (params.limit) query.set('limit', params.limit)
+    if (params.skip) query.set('skip', params.skip)
+    const qs = query.toString()
+    return apiRequest(`/audit/logs${qs ? `?${qs}` : ''}`)
+  },
+  myLogs: (limit = 50) => apiRequest(`/audit/me?limit=${limit}`),
+  test: () => apiRequest('/audit/test', { method: 'POST' }),
+}
