@@ -43,8 +43,16 @@ export async function apiRequest(path, options = {}) {
 export const authApi = {
   login: (email, password) => apiRequest('/auth/login', { method: 'POST', body: { email, password } }),
   register: (body) => apiRequest('/auth/register', { method: 'POST', body }),
+  // Flujo OAuth 2.0 Authorization Code con Google — la URL de inicio está en el backend
+  googleLoginUrl: () => `${API_URL}/auth/oauth/google/login`,
+  // Flujo legacy (ID Token directo) — mantener por compatibilidad, pero el principal es Authorization Code
   googleLogin: (credential) => apiRequest('/auth/oauth/google', { method: 'POST', body: { credential } }),
   me: () => apiRequest('/auth/me'),
+}
+
+// Construye la URL completa del backend a partir de un path relativo (útil para redirecciones OAuth)
+export function backendUrl(path) {
+  return `${API_URL}${path}`
 }
 
 export const notificationsApi = {

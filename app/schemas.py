@@ -424,7 +424,7 @@ class CommentResponse(BaseModel):
 
 class MentorshipResponse(BaseModel):
     id: UUID
-    project_id: UUID
+    project_id: Optional[UUID] = None
     mentor_id: UUID
     title: str
     description: Optional[str] = None

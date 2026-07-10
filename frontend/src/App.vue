@@ -98,10 +98,13 @@ const handleRegister = async () => {
   catch (e) { error.value = e.message } finally { loading.value = false }
 }
 const handleGoogle = async (response) => {
+  // Legacy: ID Token flow (mantener por compatibilidad durante la transición)
   loading.value = true; error.value = ''
   try { const res = await authApi.googleLogin(response.credential); setSession(res.access_token, res.user); user.value = res.user; token.value = res.access_token; await loadAll(); await fetchUnreadCount() }
   catch (e) { error.value = e.message } finally { loading.value = false }
 }
+// Login con Google vía Authorization Code flow (redirige al backend, que inicia el flujo OAuth)
+const loginWithGoogle = () => { window.location.href = authApi.googleLoginUrl() }
 const handleLogout = () => { clearSession(); user.value = null; token.value = '' }
 
 /* ─── Data loaders ─── */
@@ -238,9 +241,11 @@ const scheduleMentorship = async () => {
     callback: async (tokenResponse) => {
       if (tokenResponse.error) { error.value = 'Error de autorización'; forms.schedulingMentorship = false; return }
       try {
+        // Preferir data.myProject (emprendedor); si no, usar el primer proyecto donde el mentor está asignado
+        const projectId = data.myProject?.id || (data.mentorProjects && data.mentorProjects[0]?.id) || null
         const res = await mentorshipsApi.create({
           google_access_token: tokenResponse.access_token,
-          project_id: data.myProject?.id || null,
+          project_id: projectId,
           title: forms.mentorship.title,
           description: forms.mentorship.description,
           start_datetime: forms.mentorship.start_datetime,
@@ -253,7 +258,7 @@ const scheduleMentorship = async () => {
         // Recargar lista de mentorías
         data.mentorships = await mentorshipsApi.list().catch(() => [])
         await fetchUnreadCount()
-      } catch (e) { error.value = e.message }
+      } catch (e) { error.value = e.message || 'Error al agendar mentoría' }
       finally { forms.schedulingMentorship = false }
     },
   })
@@ -274,12 +279,34 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-PE', { day: '2-dig
 const fmtDateTime = (d) => d ? new Date(d).toLocaleString('es-PE', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
-onMounted(() => {
+
+// Manejar el redirect OAuth: si volvemos del backend con ?token=<jwt>, procesar el login
+async function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.search)
+  const tokenFromUrl = params.get('token')
+  if (!tokenFromUrl) return
+  // Limpiar la URL inmediatamente
+  window.history.replaceState({}, document.title, window.location.pathname)
+  loading.value = true
+  try {
+    localStorage.setItem('parmenia_token', tokenFromUrl)
+    token.value = tokenFromUrl
+    const me = await authApi.me()
+    user.value = me
+    setSession(tokenFromUrl, me)
+    await loadAll()
+    await fetchUnreadCount()
+  } catch (e) {
+    error.value = 'No se pudo completar el login con Google: ' + (e.message || '')
+    clearSession(); user.value = null; token.value = ''
+  } finally { loading.value = false }
+}
+
+onMounted(async () => {
+  await handleOAuthCallback()
   if (isAuthenticated.value) { loadAll(); fetchUnreadCount() }
-  if (googleClientId && window.google) { window.google.accounts.id.initialize({ client_id: googleClientId, callback: handleGoogle }) }
   if (isAuthenticated.value) setInterval(fetchUnreadCount, 60000)
 })
-const renderGoogle = () => { if (googleClientId && window.google && !isAuthenticated.value) window.google.accounts.id.renderButton(document.getElementById('google-btn'), { theme: 'outline', size: 'large', width: '100%' }) }
 </script>
 
 <template>
@@ -311,7 +338,7 @@ const renderGoogle = () => { if (googleClientId && window.google && !isAuthentic
           <button type="submit" :disabled="loading" class="btn-primary w-full"><span v-if="loading">⏳</span> Crear cuenta</button>
         </form>
         <div class="flex items-center gap-3 py-1"><div class="flex-1 h-px bg-parmenia-border"></div><span class="text-xs text-parmenia-textDim">o</span><div class="flex-1 h-px bg-parmenia-border"></div></div>
-        <div id="google-btn" class="flex justify-center" :data-render="renderGoogle()"></div>
+        <button type="button" @click="loginWithGoogle" :disabled="loading" class="w-full flex items-center justify-center gap-3 py-2.5 px-4 border border-parmenia-border rounded-md bg-white hover:bg-parmenia-bg transition text-sm font-medium text-parmenia-text"><svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Continuar con Google</button>
       </div>
       <p class="text-center text-xs text-parmenia-textDim mt-6">Parmenia v1.0 · Universidad La Salle</p>
     </div>

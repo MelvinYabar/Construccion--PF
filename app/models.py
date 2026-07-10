@@ -42,6 +42,7 @@ class Profile(Base):
     faculty = Column(Text)
     skills = Column(ARRAY(Text))
     role = Column(SqlEnum(UserRole, name="user_role", create_type=False), default=UserRole.emprendedor)
+    google_sub = Column(Text, unique=True, nullable=True)  # claim `sub` de Google — identidad estable del proveedor OAuth
     created_at = Column(DateTime(timezone=True), default=utc_now)
 
     posts = relationship("Post", back_populates="author", passive_deletes=True)
@@ -220,7 +221,7 @@ class Mentorship(Base):
     __tablename__ = "mentorships"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=True)
     mentor_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id"), nullable=False)
     title = Column(Text, nullable=False)
     description = Column(Text)

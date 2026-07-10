@@ -105,8 +105,8 @@ def list_mentorships(
     if current_user.role == models.UserRole.mentor:
         query = query.filter(models.Mentorship.mentor_id == current_user.id)
     elif current_user.role == models.UserRole.emprendedor:
-        # Mentorías de proyectos donde es miembro
-        query = query.join(models.ProjectMember, models.ProjectMember.project_id == models.Mentorship.project_id).filter(
-            models.ProjectMember.user_id == current_user.id
+        # Mentorías de proyectos donde es miembro (LEFT JOIN para tolerar project_id NULL)
+        query = query.outerjoin(models.ProjectMember, models.ProjectMember.project_id == models.Mentorship.project_id).filter(
+            (models.ProjectMember.user_id == current_user.id) | (models.Mentorship.mentor_id == current_user.id)
         )
     return query.order_by(models.Mentorship.start_datetime.desc()).all()
