@@ -1,12 +1,12 @@
 @import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700;800;900&display=swap");
 
 :root {
-  --bg: #f5f7fb;
-  --surface: #ffffff;
-  --surface-muted: #eef4fb;
-  --surface-strong: #fdfefe;
-  --line: #dbe5ef;
-  --line-strong: #bfd0df;
+  --bg: #edf3f8;
+  --surface: #edf3f8;
+  --surface-muted: #e3edf5;
+  --surface-strong: #f4f8fb;
+  --line: rgba(255, 255, 255, 0.62);
+  --line-strong: rgba(137, 158, 179, 0.24);
   --text: #172638;
   --muted: #66788a;
   --primary: #246b9f;
@@ -19,8 +19,12 @@
   --warning-soft: #fff2d4;
   --danger: #a33a33;
   --danger-soft: #f8dfdc;
-  --shadow: 0 18px 45px rgba(31, 54, 78, 0.08);
-  --radius: 8px;
+  --shadow-dark: rgba(124, 146, 166, 0.35);
+  --shadow-light: rgba(255, 255, 255, 0.96);
+  --shadow: 12px 12px 28px var(--shadow-dark), -12px -12px 28px var(--shadow-light);
+  --shadow-soft: 7px 7px 16px rgba(124, 146, 166, 0.24), -7px -7px 16px rgba(255, 255, 255, 0.86);
+  --shadow-inset: inset 6px 6px 12px rgba(124, 146, 166, 0.22), inset -6px -6px 12px rgba(255, 255, 255, 0.9);
+  --radius: 18px;
   color-scheme: light;
   font-family: "Nunito Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -32,7 +36,8 @@
 body {
   margin: 0;
   background:
-    linear-gradient(180deg, rgba(36, 107, 159, 0.09), transparent 300px),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 360px),
+    linear-gradient(145deg, #f3f7fb, #e6eef5 65%, #edf3f8),
     var(--bg);
   color: var(--text);
 }
@@ -46,9 +51,10 @@ textarea {
 
 button {
   align-items: center;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--primary);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #2d79af, #1f5f92);
+  box-shadow: 7px 7px 16px rgba(36, 82, 118, 0.23), -7px -7px 16px rgba(255, 255, 255, 0.78);
   color: #fff;
   cursor: pointer;
   display: inline-flex;
@@ -56,12 +62,17 @@ button {
   justify-content: center;
   min-height: 42px;
   padding: 0 16px;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 button:hover {
-  background: var(--primary-strong);
+  background: linear-gradient(145deg, #327fb6, #1b557f);
   transform: translateY(-1px);
+}
+
+button:active {
+  box-shadow: inset 4px 4px 9px rgba(21, 60, 90, 0.28), inset -4px -4px 9px rgba(255, 255, 255, 0.22);
+  transform: translateY(0);
 }
 
 button:focus-visible,
@@ -74,18 +85,25 @@ textarea:focus-visible {
 
 button.secondary,
 button.ghost {
-  background: #fff;
-  border-color: var(--line-strong);
+  background: var(--surface);
+  border-color: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-soft);
   color: var(--text);
 }
 
 button.secondary:hover,
 button.ghost:hover {
-  background: var(--surface-muted);
+  background: linear-gradient(145deg, #f6f9fc, #e3edf5);
+}
+
+button.secondary:active,
+button.ghost:active {
+  box-shadow: var(--shadow-inset);
 }
 
 button.danger {
-  background: var(--danger);
+  background: linear-gradient(145deg, #b94740, #91312c);
+  box-shadow: 7px 7px 16px rgba(126, 57, 52, 0.2), -7px -7px 16px rgba(255, 255, 255, 0.78);
 }
 
 button.danger:hover {
@@ -96,9 +114,10 @@ input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-inset);
   color: var(--text);
   min-height: 42px;
   padding: 10px 12px;
@@ -107,6 +126,13 @@ textarea {
 input::placeholder,
 textarea::placeholder {
   color: #95a39d;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  background: #f4f8fb;
+  border-color: rgba(36, 107, 159, 0.28);
 }
 
 textarea {
@@ -142,8 +168,9 @@ code {
 }
 
 .sidebar {
-  background: linear-gradient(180deg, #ffffff, #f0f6fb);
-  border-right: 1px solid var(--line);
+  background: linear-gradient(145deg, #f7fafd, #e7eff6);
+  border-right: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: 10px 0 24px rgba(124, 146, 166, 0.16);
   color: var(--text);
   display: flex;
   flex-direction: column;
@@ -156,7 +183,7 @@ code {
   display: flex;
   gap: 12px;
   padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.72);
 }
 
 .brand strong {
@@ -173,8 +200,9 @@ code {
   width: 42px;
   height: 42px;
   place-items: center;
-  border-radius: 8px;
+  border-radius: 16px;
   background: linear-gradient(135deg, var(--primary), var(--accent));
+  box-shadow: 6px 6px 14px rgba(36, 82, 118, 0.24), -6px -6px 14px rgba(255, 255, 255, 0.82);
   color: #ffffff;
   font-weight: 900;
 }
@@ -189,6 +217,7 @@ code {
   justify-content: flex-start;
   background: transparent;
   border-color: transparent;
+  box-shadow: none;
   color: #425466;
   min-height: 44px;
   padding: 0 14px;
@@ -224,17 +253,19 @@ code {
 .sidebar nav button.active,
 .sidebar nav button:hover {
   background: var(--primary-soft);
-  border-color: #c5dff2;
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-inset);
   color: var(--primary-strong);
   transform: none;
 }
 
 .sidebar-card {
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--radius);
   margin-top: auto;
   padding: 14px;
-  background: #ffffff;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
 .sidebar-card span,
@@ -287,8 +318,9 @@ main {
 .notice,
 .error,
 .loading {
-  border: 1px solid transparent;
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
   margin: 0 0 14px;
   padding: 11px 13px;
 }
@@ -321,6 +353,7 @@ main {
 .welcome-panel {
   background: linear-gradient(135deg, #1f5f8f, #267f96);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
   color: #fff;
   padding: 24px;
   position: relative;
@@ -368,6 +401,7 @@ main {
 .trust-row span {
   border: 1px solid rgba(255, 255, 255, 0.24);
   border-radius: 999px;
+  box-shadow: inset 3px 3px 7px rgba(27, 75, 106, 0.24), inset -3px -3px 7px rgba(255, 255, 255, 0.12);
   color: #edf5f1;
   padding: 6px 10px;
   font-size: 13px;
@@ -377,9 +411,9 @@ main {
 .record-card,
 .empty-state {
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--radius);
-  box-shadow: 0 10px 26px rgba(31, 54, 78, 0.045);
+  box-shadow: var(--shadow);
 }
 
 .panel {
@@ -392,6 +426,11 @@ main {
   align-items: center;
   display: flex;
   margin: 0 0 12px;
+}
+
+.panel:hover,
+.record-card:hover {
+  box-shadow: 14px 14px 32px rgba(124, 146, 166, 0.32), -14px -14px 32px rgba(255, 255, 255, 0.96);
 }
 
 .auth-panel {
@@ -418,14 +457,14 @@ main {
 .toolbar {
   align-items: center;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--radius);
   display: flex;
   gap: 16px;
   justify-content: space-between;
   margin-bottom: 16px;
   padding: 16px;
-  box-shadow: 0 10px 26px rgba(31, 54, 78, 0.045);
+  box-shadow: var(--shadow);
 }
 
 .toolbar-copy strong {
@@ -476,7 +515,7 @@ main {
 }
 
 .record-actions {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
   display: grid;
   gap: 12px;
   margin-top: 14px;
@@ -532,9 +571,10 @@ main {
 }
 
 .metric {
-  background: linear-gradient(180deg, #ffffff, var(--surface-muted));
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-inset);
   padding: 13px;
 }
 
@@ -558,6 +598,7 @@ main {
   font-weight: 800;
   min-height: 26px;
   padding: 0 10px;
+  box-shadow: 3px 3px 7px rgba(124, 146, 166, 0.16), -3px -3px 7px rgba(255, 255, 255, 0.72);
 }
 
 .badge.success {
@@ -604,9 +645,10 @@ main {
 }
 
 .action-box {
-  background: var(--surface-muted);
-  border: 1px solid var(--line);
+  background: var(--surface);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-inset);
   display: grid;
   gap: 9px;
   padding: 12px;
@@ -614,6 +656,12 @@ main {
 
 .action-box button {
   justify-self: stretch;
+}
+
+.action-box input,
+.action-box select,
+.action-box textarea {
+  box-shadow: inset 4px 4px 9px rgba(124, 146, 166, 0.18), inset -4px -4px 9px rgba(255, 255, 255, 0.82);
 }
 
 .action-title {
@@ -629,7 +677,7 @@ main {
 }
 
 .calendar-result {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid rgba(255, 255, 255, 0.72);
   margin-top: 14px;
   padding-top: 14px;
 }
