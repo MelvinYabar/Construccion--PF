@@ -114,6 +114,50 @@ Frontend:
 http://localhost:5173
 ```
 
+## Deploy
+
+### Backend en Render
+
+El backend FastAPI esta preparado para Render con:
+
+```text
+render.yaml
+```
+
+Variables necesarias en Render:
+
+```env
+DATABASE_URL=...
+JWT_SECRET=...
+GOOGLE_CLIENT_ID=...
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+```
+
+Comandos usados por Render:
+
+```text
+Build Command: pip install -r requirements.txt
+Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+### Frontend en Vercel
+
+El frontend Vue/Vite esta preparado para Vercel con:
+
+```text
+vercel.json
+```
+
+Variables necesarias en Vercel:
+
+```env
+VITE_API_URL=https://tu-backend-en-render.onrender.com
+VITE_GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
+```
+
+Despues de desplegar, agrega el dominio de Vercel en Google Cloud como origen autorizado para OAuth2.
+
 ## OAuth2 con Google
 
 El frontend carga Google Identity Services. Cuando el usuario inicia sesion con Google, el frontend recibe un `credential` de Google y lo envia al backend:
