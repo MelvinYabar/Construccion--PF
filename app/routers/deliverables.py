@@ -63,6 +63,16 @@ def create_deliverable(
     db.add(deliverable)
     db.commit()
     db.refresh(deliverable)
+
+    # Notificar a los mentores del proyecto
+    from app.routers.notifications import create_notification
+    mentors = db.query(models.ProjectMentor).filter(models.ProjectMentor.project_id == project_id).all()
+    phase = db.query(models.Phase).filter(models.Phase.id == deliverable_in.phase_id).first()
+    phase_label = phase.name if phase else "una fase"
+    for m in mentors:
+        create_notification(db, m.mentor_id, "Nuevo entregable", f"Se subió un entregable para la fase '{phase_label}'.", "deliverable", deliverable.id)
+    db.commit()
+
     return deliverable
 
 
@@ -235,6 +245,17 @@ def create_deliverable_review(
     if not is_admin(current_user) and not is_project_mentor(db, deliverable.project_id, current_user.id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mentor is not assigned to this project")
 
+    # FIX: No permitir múltiples aprobaciones del mismo deliverable
+    existing_approved = db.query(models.DeliverableReview).filter(
+        models.DeliverableReview.deliverable_id == deliverable_id,
+        models.DeliverableReview.status == models.ReviewStatus.aprobado,
+    ).first()
+    if existing_approved:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Este entregable ya tiene una revisión aprobada",
+        )
+
     review = models.DeliverableReview(
         deliverable_id=deliverable_id,
         mentor_id=current_user.id,
@@ -245,18 +266,20 @@ def create_deliverable_review(
     try:
         db.add(review)
 
+        # FIX: Solo avanzar si la fase del deliverable coincide con la fase actual del proyecto
         if review_in.status == models.ReviewStatus.aprobado:
             project = deliverable.project
-            base_phase = project.current_phase or deliverable.phase
-            if base_phase:
-                next_phase = (
-                    db.query(models.Phase)
-                    .filter(models.Phase.order > base_phase.order)
-                    .order_by(models.Phase.order.asc())
-                    .first()
-                )
-                if next_phase:
-                    project.current_phase_id = next_phase.id
+            if project and project.current_phase_id == deliverable.phase_id:
+                base_phase = deliverable.phase
+                if base_phase:
+                    next_phase = (
+                        db.query(models.Phase)
+                        .filter(models.Phase.order > base_phase.order)
+                        .order_by(models.Phase.order.asc())
+                        .first()
+                    )
+                    if next_phase:
+                        project.current_phase_id = next_phase.id
 
         db.commit()
     except Exception:
@@ -264,6 +287,17 @@ def create_deliverable_review(
         raise
 
     db.refresh(review)
+
+    # Notificar a los miembros del proyecto sobre la revisión
+    from app.routers.notifications import create_notification
+    project = deliverable.project
+    if project:
+        members = db.query(models.ProjectMember).filter(models.ProjectMember.project_id == project.id).all()
+        status_label = "aprobado" if review.status == models.ReviewStatus.aprobado else "rechazado"
+        for m in members:
+            create_notification(db, m.user_id, "Entregable revisado", f"Tu entregable fue {status_label}.", "review", deliverable.id)
+        db.commit()
+
     return review
 
 

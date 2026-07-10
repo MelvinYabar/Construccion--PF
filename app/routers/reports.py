@@ -71,9 +71,11 @@ def dashboard_report(
 
     # --- Convocatorias activas ---
     from datetime import date
+    from sqlalchemy import or_
+
     active_cohorts = (
         db.query(func.count(models.Cohort.id))
-        .filter(models.Cohort.end_date >= date.today())
+        .filter(or_(models.Cohort.end_date >= date.today(), models.Cohort.end_date.is_(None)))
         .scalar() or 0
     )
 

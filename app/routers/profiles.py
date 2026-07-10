@@ -70,14 +70,30 @@ def create_profile(
 def list_profiles(
     skip: int = 0,
     limit: int = 20,
+    search: str = None,
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
-    """Lista perfiles. Admin ve todos; usuarios no admin solo ven su propio perfil."""
-    if not is_admin(current_user):
-        return db.query(models.Profile).filter(models.Profile.id == current_user.id).all()
+    """Lista perfiles. Admin ve todos; usuarios no admin pueden buscar por nombre/email."""
+    query = db.query(models.Profile)
 
-    return db.query(models.Profile).offset(skip).limit(limit).all()
+    if not is_admin(current_user):
+        # No admin: si hay búsqueda, permite buscar otros usuarios (para añadir miembros)
+        # Si no hay búsqueda, solo devuelve su propio perfil
+        if search:
+            query = query.filter(
+                (models.Profile.email.ilike(f"%{search}%")) |
+                (models.Profile.full_name.ilike(f"%{search}%"))
+            )
+        else:
+            query = query.filter(models.Profile.id == current_user.id)
+    elif search:
+        query = query.filter(
+            (models.Profile.email.ilike(f"%{search}%")) |
+            (models.Profile.full_name.ilike(f"%{search}%"))
+        )
+
+    return query.offset(skip).limit(limit).all()
 
 
 # ---------------------------------------------------------------------------

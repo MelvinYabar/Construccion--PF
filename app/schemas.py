@@ -217,11 +217,11 @@ class ProjectDetailResponse(BaseModel):
 
 
 class ProjectMemberCreate(BaseModel):
-    user_id: UUID
+    user_id: str
 
 
 class ProjectMentorCreate(BaseModel):
-    mentor_id: UUID
+    mentor_id: str
 
 
 class MessageResponse(BaseModel):
@@ -361,6 +361,7 @@ class CohortProgressReport(BaseModel):
 
 class GoogleCalendarMentorshipCreate(BaseModel):
     google_access_token: str
+    project_id: Optional[UUID] = None
     title: str = "Mentoria Parmenia"
     description: Optional[str] = None
     start_datetime: datetime
@@ -378,3 +379,96 @@ class GoogleCalendarMentorshipResponse(BaseModel):
     html_link: Optional[str] = None
     meet_link: Optional[str] = None
     attendees: list[str] = []
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+class NotificationResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    title: str
+    message: str
+    type: str = "info"
+    is_read: bool = False
+    related_id: Optional[UUID] = None
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Deliverable Comments
+# ---------------------------------------------------------------------------
+
+class CommentCreate(BaseModel):
+    content: str
+
+
+class CommentResponse(BaseModel):
+    id: UUID
+    deliverable_id: UUID
+    author_id: UUID
+    author_name: Optional[str] = None
+    author_role: Optional[str] = None
+    content: str
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Mentorships (persistidas)
+# ---------------------------------------------------------------------------
+
+class MentorshipResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    mentor_id: UUID
+    title: str
+    description: Optional[str] = None
+    start_datetime: datetime
+    end_datetime: datetime
+    google_event_id: Optional[str] = None
+    google_html_link: Optional[str] = None
+    google_meet_link: Optional[str] = None
+    status: str = "agendada"
+    created_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Project Public Detail
+# ---------------------------------------------------------------------------
+
+class ProjectPublicDetail(BaseModel):
+    id: UUID
+    name: str
+    description: Optional[str] = None
+    cohort_name: Optional[str] = None
+    current_phase_name: Optional[str] = None
+    leader_name: Optional[str] = None
+    member_count: int = 0
+    mentor_count: int = 0
+    progress_percentage: float = 0.0
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ---------------------------------------------------------------------------
+# Entrepreneur Stats
+# ---------------------------------------------------------------------------
+
+class EntrepreneurStats(BaseModel):
+    project_name: Optional[str] = None
+    current_phase: Optional[str] = None
+    total_phases: int = 0
+    current_phase_order: int = 0
+    progress_percentage: float = 0.0
+    deliverables_uploaded: int = 0
+    deliverables_approved: int = 0
+    deliverables_pending: int = 0
+    enrollments_total: int = 0
+    enrollments_accepted: int = 0

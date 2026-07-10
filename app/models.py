@@ -159,6 +159,7 @@ class Deliverable(Base):
     phase = relationship("Phase", back_populates="deliverables")
     uploader = relationship("Profile")
     reviews = relationship("DeliverableReview", back_populates="deliverable")
+    comments = relationship("DeliverableComment", back_populates="deliverable", cascade="all, delete-orphan")
 
 
 class DeliverableReview(Base):
@@ -172,4 +173,64 @@ class DeliverableReview(Base):
     reviewed_at = Column(DateTime(timezone=True), default=utc_now)
 
     deliverable = relationship("Deliverable", back_populates="reviews")
+    mentor = relationship("Profile")
+
+
+# ---------------------------------------------------------------------------
+# Notifications
+# ---------------------------------------------------------------------------
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id"), nullable=False)
+    title = Column(Text, nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(Text, default="info")  # info, success, warning, deliverable, review, enrollment
+    is_read = Column(Boolean, default=False)
+    related_id = Column(UUID(as_uuid=True), nullable=True)  # ID del recurso relacionado
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+    user = relationship("Profile")
+
+
+# ---------------------------------------------------------------------------
+# Deliverable Comments (chat entre emprendedor y mentor)
+# ---------------------------------------------------------------------------
+
+class DeliverableComment(Base):
+    __tablename__ = "deliverable_comments"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    deliverable_id = Column(UUID(as_uuid=True), ForeignKey("deliverables.id"), nullable=False)
+    author_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+    deliverable = relationship("Deliverable", back_populates="comments")
+    author = relationship("Profile")
+
+
+# ---------------------------------------------------------------------------
+# Mentorships (Google Calendar events persistidos)
+# ---------------------------------------------------------------------------
+
+class Mentorship(Base):
+    __tablename__ = "mentorships"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False)
+    mentor_id = Column(UUID(as_uuid=True), ForeignKey("profiles.id"), nullable=False)
+    title = Column(Text, nullable=False)
+    description = Column(Text)
+    start_datetime = Column(DateTime(timezone=True), nullable=False)
+    end_datetime = Column(DateTime(timezone=True), nullable=False)
+    google_event_id = Column(Text)
+    google_html_link = Column(Text)
+    google_meet_link = Column(Text)
+    status = Column(Text, default="agendada")  # agendada, completada, cancelada
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+
+    project = relationship("Project")
     mentor = relationship("Profile")

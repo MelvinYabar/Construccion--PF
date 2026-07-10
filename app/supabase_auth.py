@@ -16,15 +16,16 @@ def create_supabase_auth_user(
     full_name: str | None = None,
     role: str | None = None,
 ) -> None:
-    """Mirror a local profile into Supabase Authentication > Users."""
+    """Mirror a local profile into Supabase Authentication > Users.
+    If Supabase is not configured, returns silently (does not fail).
+    """
+    if not supabase_auth_enabled():
+        import logging
+        logging.getLogger("parmenia.supabase").info("Supabase not configured — skipping Auth sync")
+        return None
+
     supabase_url = os.getenv("SUPABASE_URL")
     service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-    if not supabase_url or not service_role_key:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required to sync Supabase Auth users",
-        )
 
     generated_password = password or secrets.token_urlsafe(24)
     response = requests.post(

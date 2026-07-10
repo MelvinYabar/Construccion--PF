@@ -18,6 +18,62 @@ def get_project_or_404(db: Session, project_id: UUID) -> models.Project:
     return project
 
 
+# ---------------------------------------------------------------------------
+# MY STATS — debe ir ANTES de las rutas con {project_id} para que FastAPI
+# no interprete "my-stats" como un UUID
+# ---------------------------------------------------------------------------
+
+@router.get("/my-stats", response_model=schemas.EntrepreneurStats)
+def get_my_stats(
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Estadísticas del emprendedor: proyecto, fase, entregables, inscripciones."""
+    project = db.query(models.Project).filter(models.Project.leader_id == current_user.id).first()
+
+    total_phases = db.query(models.Phase).count() or 1
+    current_order = 0
+    current_phase_name = None
+    project_name = None
+
+    if project:
+        project_name = project.name
+        if project.current_phase:
+            current_phase_name = project.current_phase.name
+            current_order = project.current_phase.order or 0
+
+    progress = min(100.0, round((current_order / total_phases) * 100, 1))
+
+    deliverables_uploaded = 0
+    deliverables_approved = 0
+    if project:
+        deliverables_uploaded = db.query(models.Deliverable).filter(models.Deliverable.project_id == project.id).count()
+        deliverables_approved = (
+            db.query(models.DeliverableReview)
+            .join(models.Deliverable)
+            .filter(models.Deliverable.project_id == project.id, models.DeliverableReview.status == models.ReviewStatus.aprobado)
+            .count()
+        )
+
+    enrollments_total = db.query(models.Enrollment).filter(models.Enrollment.user_id == current_user.id).count()
+    enrollments_accepted = db.query(models.Enrollment).filter(
+        models.Enrollment.user_id == current_user.id, models.Enrollment.status == models.EnrollmentStatus.aceptada
+    ).count()
+
+    return schemas.EntrepreneurStats(
+        project_name=project_name,
+        current_phase=current_phase_name,
+        total_phases=total_phases,
+        current_phase_order=current_order,
+        progress_percentage=progress,
+        deliverables_uploaded=deliverables_uploaded,
+        deliverables_approved=deliverables_approved,
+        deliverables_pending=deliverables_uploaded - deliverables_approved,
+        enrollments_total=enrollments_total,
+        enrollments_accepted=enrollments_accepted,
+    )
+
+
 # ===========================================================================
 # PROJECTS CRUD
 # ===========================================================================
@@ -194,33 +250,46 @@ def add_project_member(
     if not is_admin(current_user) and project.leader_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el lider del proyecto o admin pueden agregar miembros")
 
-    user = db.query(models.Profile).filter(models.Profile.id == member_in.user_id).first()
+    # Convertir string a UUID para la consulta
+    try:
+        member_uuid = UUID(str(member_in.user_id))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user_id format")
+
+    user = db.query(models.Profile).filter(models.Profile.id == member_uuid).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
 
-    if is_project_member(db, project_id, member_in.user_id):
+    if is_project_member(db, project_id, member_uuid):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already a project member")
 
-    db.add(models.ProjectMember(project_id=project_id, user_id=member_in.user_id))
+    db.add(models.ProjectMember(project_id=project_id, user_id=member_uuid))
     db.commit()
     return {"message": "Project member added"}
 
 
-@router.get("/{project_id}/members", response_model=list[schemas.UserSummary])
+@router.get("/{project_id}/members")
 def list_project_members(
     project_id: UUID,
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
-    """Lista los miembros de un proyecto."""
+    """Lista los miembros de un proyecto con datos completos del usuario."""
     project = get_project_or_404(db, project_id)
     if not can_access_project(db, project_id, current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project access denied")
 
-    return [
-        schemas.UserSummary(user_id=member.user_id, full_name=member.user.full_name)
-        for member in project.members
-    ]
+    result = []
+    for member in project.members:
+        profile = db.query(models.Profile).filter(models.Profile.id == member.user_id).first()
+        result.append({
+            "user_id": str(member.user_id),
+            "full_name": profile.full_name if profile else None,
+            "email": profile.email if profile else None,
+            "role": profile.role.value if profile and profile.role else None,
+            "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+        })
+    return result
 
 
 @router.delete("/{project_id}/members/{user_id}", response_model=schemas.MessageResponse)
@@ -270,7 +339,12 @@ def add_project_mentor(
     require_roles(current_user, [models.UserRole.admin])
     get_project_or_404(db, project_id)
 
-    mentor = db.query(models.Profile).filter(models.Profile.id == mentor_in.mentor_id).first()
+    try:
+        mentor_uuid = UUID(str(mentor_in.mentor_id))
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid mentor_id format")
+
+    mentor = db.query(models.Profile).filter(models.Profile.id == mentor_uuid).first()
     if not mentor:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mentor profile not found")
     if mentor.role != models.UserRole.mentor:
@@ -278,32 +352,39 @@ def add_project_mentor(
 
     existing = (
         db.query(models.ProjectMentor)
-        .filter(models.ProjectMentor.project_id == project_id, models.ProjectMentor.mentor_id == mentor_in.mentor_id)
+        .filter(models.ProjectMentor.project_id == project_id, models.ProjectMentor.mentor_id == mentor_uuid)
         .first()
     )
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mentor is already assigned to this project")
 
-    db.add(models.ProjectMentor(project_id=project_id, mentor_id=mentor_in.mentor_id))
+    db.add(models.ProjectMentor(project_id=project_id, mentor_id=mentor_uuid))
     db.commit()
     return {"message": "Project mentor assigned"}
 
 
-@router.get("/{project_id}/mentors", response_model=list[schemas.UserSummary])
+@router.get("/{project_id}/mentors")
 def list_project_mentors(
     project_id: UUID,
     db: Session = Depends(get_db),
     current_user: schemas.AuthenticatedUser = Depends(get_current_user),
 ):
-    """Lista los mentores de un proyecto."""
+    """Lista los mentores de un proyecto con datos completos."""
     project = get_project_or_404(db, project_id)
     if not can_access_project(db, project_id, current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project access denied")
 
-    return [
-        schemas.UserSummary(user_id=mentor.mentor_id, full_name=mentor.mentor.full_name)
-        for mentor in project.mentors
-    ]
+    result = []
+    for mentor in project.mentors:
+        profile = db.query(models.Profile).filter(models.Profile.id == mentor.mentor_id).first()
+        result.append({
+            "mentor_id": str(mentor.mentor_id),
+            "full_name": profile.full_name if profile else None,
+            "email": profile.email if profile else None,
+            "role": profile.role.value if profile and profile.role else None,
+            "assigned_at": mentor.assigned_at.isoformat() if mentor.assigned_at else None,
+        })
+    return result
 
 
 @router.delete("/{project_id}/mentors/{mentor_id}", response_model=schemas.MessageResponse)
@@ -330,3 +411,75 @@ def remove_project_mentor(
     db.delete(assignment)
     db.commit()
     return {"message": "Project mentor removed"}
+
+
+# ---------------------------------------------------------------------------
+# PROJECT PUBLIC DETAIL
+# ---------------------------------------------------------------------------
+
+@router.get("/{project_id}/public-detail", response_model=schemas.ProjectPublicDetail)
+def get_project_public_detail(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Detalle público de un proyecto con stats agregadas."""
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    member_count = db.query(models.ProjectMember).filter(models.ProjectMember.project_id == project_id).count()
+    mentor_count = db.query(models.ProjectMentor).filter(models.ProjectMentor.project_id == project_id).count()
+
+    total_phases = db.query(models.Phase).count() or 1
+    current_order = project.current_phase.order if project.current_phase else 0
+    progress = min(100.0, round((current_order / total_phases) * 100, 1))
+
+    return schemas.ProjectPublicDetail(
+        id=project.id,
+        name=project.name,
+        description=project.description,
+        cohort_name=project.cohort.name if project.cohort else None,
+        current_phase_name=project.current_phase.name if project.current_phase else None,
+        leader_name=project.leader.full_name if project.leader else None,
+        member_count=member_count,
+        mentor_count=mentor_count,
+        progress_percentage=progress,
+    )
+
+
+# ---------------------------------------------------------------------------
+# ADMIN: Change project phase manually
+# ---------------------------------------------------------------------------
+
+@router.put("/{project_id}/phase", response_model=schemas.ProjectResponse)
+def change_project_phase(
+    project_id: UUID,
+    phase_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.AuthenticatedUser = Depends(get_current_user),
+):
+    """Cambia manualmente la fase de un proyecto. Solo admin."""
+    require_roles(current_user, [models.UserRole.admin])
+
+    project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    phase = db.query(models.Phase).filter(models.Phase.id == phase_id).first()
+    if not phase:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Phase not found")
+
+    project.current_phase_id = phase_id
+    db.commit()
+    db.refresh(project)
+
+    # Notificar a los miembros
+    from app.routers.notifications import create_notification
+    members = db.query(models.ProjectMember).filter(models.ProjectMember.project_id == project_id).all()
+    for m in members:
+        create_notification(db, m.user_id, "Fase actualizada", f"Tu proyecto '{project.name}' avanzó a la fase: {phase.name}", "info", project_id)
+    db.commit()
+
+    return project
+
